@@ -1,3 +1,5 @@
+;(function($) {
+
 window.MercadoLibre = {
   baseURL: "https://api.mercadolibre.com",
   authorizationURL: "http://evening-earth-50.heroku.com/oauth/login",
@@ -136,3 +138,5 @@ window.MercadoLibre = {
 MercadoLibre._parseHash()
 
 MercadoLibre._checkPostAuthorization()
+
+})(jQuery);
