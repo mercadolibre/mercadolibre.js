@@ -10,6 +10,8 @@ window.MercadoLibre = {
   init: function(options) {
     this.options = options
 
+    if (this.options.sandbox) this.baseURL = this.baseURL.replace(/api\./, "sandbox.")
+
     this._parseHash()
 
     this._checkPostAuthorization()
