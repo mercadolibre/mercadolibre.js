@@ -84,7 +84,7 @@ window.MercadoLibre = {
   // after authentication inside an iframe.
   _checkPostAuthorization: function() {
     if (this.hash.state && this.hash.state == "iframe") {
-      window.opener.MercadoLibre.loginComplete()
+      window.opener.MercadoLibre._loginComplete()
     }
   },
 
