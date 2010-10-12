@@ -2,7 +2,7 @@
 
 window.MercadoLibre = {
   baseURL: "https://api.mercadolibre.com",
-  authorizationURL: "http://evening-earth-50.heroku.com/oauth/login",
+  authorizationURL: "http://oauth.mercadolibre.com/jms/mla/authorization",
 
   hash: {},
   callbacks: {},
