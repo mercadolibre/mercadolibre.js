@@ -122,8 +122,8 @@ window.MercadoLibre = {
 
   _popup: function(url) {
     if (!this._popupWindow || this._popupWindow.closed) {
-      var width = 400
-      var height = 200
+      var width = 830
+      var height = 510
       var left = parseInt((screen.availWidth - width) / 2);
       var top = parseInt((screen.availHeight - height) / 2);
 
