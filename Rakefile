@@ -19,7 +19,7 @@ file "mercadolibre.js" => "pkg" do |t|
       while line = io.gets
         file.puts(line)
       end
-    
+
       file.puts
     end
 
@@ -41,22 +41,6 @@ end
 task :default => [:build, :minify]
 
 task :test do
-  require "selenium-webdriver"
-
-  driver = Selenium::WebDriver.for(:firefox)
-
-  driver.navigate.to "file://#{File.expand_path("test/index.html", File.dirname(__FILE__))}"
-
-  element = driver.find_element(:xpath, "//*[@id='qunit-testresult']/*[@class='failed']")
-
-  while element.text.to_s.empty?; end
-
-  failed = element.text.to_i
-
-  if failed > 0
-    $stderr.puts "Test failed -- browser left open."
-    exit 1
-  else
-    driver.quit
-  end
+  require "cutest"
+  Cutest.run(Dir["test/test.rb"])
 end

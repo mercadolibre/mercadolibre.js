@@ -46,7 +46,7 @@ window.MercadoLibre = {
 
   login: function() {
     var xd_url = window.location.protocol + "//" + window.location.host + this.options.xd_url
-    var url = this.authorizationURL + "?redirect_uri=" + escape(xd_url) + "&response_type=token&client_id=1&state=iframe"
+    var url = this.authorizationURL + "?redirect_uri=" + escape(xd_url) + "&response_type=token&client_id=" + this.options.client_id + "&state=iframe"
     this._popup(url)
   },
 
@@ -64,7 +64,7 @@ window.MercadoLibre = {
       callbacks[i].apply(null, args)
     }
   },
-  
+
   logout: function() {
     $.cookie("access_token", null)
     this._triggerSessionChange()
