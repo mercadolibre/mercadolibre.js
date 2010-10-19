@@ -5,17 +5,12 @@
  <script type="application/javascript" src="http://plugins.jquery.com/files/jquery.cookie.js.txt"></script>
  <script type="application/javascript" src="https://github.com/mercadolibre/mercadolibre.js/raw/master/src/mercadolibre.js"></script>
  <script type="application/javascript">
-   function clearList(ul) {
-     ul.children().each(function() {
-       $(this).remove();
-     });
-   }
    function updatePath(path) {
      var ul = $("#path");
      fillList(ul, path);
    }
    function fillList(ul, data) {
-     clearList(ul);
+     ul.empty();
      $.each(data, function(index, value) {
        var li = $("<LI>");
        li.attr("id", value.id);
