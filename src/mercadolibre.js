@@ -1,4 +1,4 @@
-;(function($) {
+;(function(cookie) {
 
 window.MercadoLibre = {
   baseURL: "https://api.mercadolibre.com",
@@ -20,15 +20,15 @@ window.MercadoLibre = {
   },
 
   get: function(url, callback) {
-    $.getJSON(this._url(url), callback)
+    Sroc.get(this._url(url), callback)
   },
 
   post: function(url, params, callback) {
-    $.getJSON(this._url(url) + "&_method=POST&_body=" + JSON.stringify(params), callback)
+    Sroc.post(this._url(url), params, callback)
   },
 
   getToken: function() {
-    var token = $.cookie("access_token")
+    var token = cookie("access_token")
     return (token && token.length > 0) ? token : null
   },
 
@@ -66,7 +66,7 @@ window.MercadoLibre = {
   },
 
   logout: function() {
-    $.cookie("access_token", null)
+    cookie("access_token", null)
     this._triggerSessionChange()
   },
 
@@ -109,13 +109,16 @@ window.MercadoLibre = {
 
     var self = this
 
-    $.each(hash.split("&"), function(_, fragment) {
-      var parts = fragment.match(/([A-Za-z_\-]+)=(.*)$/)
+    var pairs = hash.split("&")
+    var i
 
-      self.hash[parts[1]] = parts[2]
-    })
+    for (i = 0; i < pairs.length; i++) {
+      var pair = pairs[i].match(/([A-Za-z_\-]+)=(.*)$/)
 
-    $.cookie("access_token", this.hash.access_token)
+      self.hash[pair[1]] = pair[2]
+    }
+
+    cookie("access_token", this.hash.access_token)
 
     window.location.hash = ""
   },
@@ -141,4 +144,4 @@ MercadoLibre._parseHash()
 
 MercadoLibre._checkPostAuthorization()
 
-})(jQuery);
+})(cookie);

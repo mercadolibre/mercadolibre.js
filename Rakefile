@@ -1,33 +1,32 @@
 require "open-uri"
+require "tmpdir"
+require "erb"
 
-DEPENDENCIES = [
-  "http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.js",
-  "http://plugins.jquery.com/files/jquery.cookie.js.txt",
+BUILD = [
+  "vendor/cookie.js",
+  "tmp/sroc.js",
   "src/mercadolibre.js",
 ]
 
 directory "pkg"
+directory "tmp"
 
-file "mercadolibre.js" => "pkg" do |t|
-  File.open("pkg/#{t.name}", "w") do |file|
-    file.puts(";(function() {")
-    file.puts
+file "sroc.js" => "tmp" do |t|
+  target = File.expand_path("tmp/#{t.name}")
 
-    DEPENDENCIES.each do |uri|
-      io = open(uri)
-
-      while line = io.gets
-        file.puts(line)
-      end
-
-      file.puts
+  Dir.mktmpdir do |path|
+    Dir.chdir(path) do
+      system "wget -q http://github.com/mercadolibre/sroc/tarball/master -O sroc.tar.gz"
+      system "tar xf sroc.tar.gz --strip 1"
+      system "rake"
+      system "cp pkg/sroc.js #{target}"
     end
+  end
+end
 
-    # Until we remove jQuery...
-    file.puts("jQuery.noConflict();")
-    file.puts
-
-    file.puts("})();")
+file "mercadolibre.js" => ["pkg", "sroc.js"] do |t|
+  File.open("pkg/#{t.name}", "w") do |file|
+    file.write ERB.new(File.read("src/build.erb.js")).result(binding)
   end
 end
 
@@ -40,7 +39,7 @@ end
 
 task :default => [:build, :minify]
 
-task :test do
+task :test => :build do
   require "cutest"
   Cutest.run(Dir["test/test.rb"])
 end
