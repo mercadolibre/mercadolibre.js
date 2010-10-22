@@ -89,14 +89,14 @@ window.MercadoLibre = {
   },
 
   _url: function(url) {
-    var append = url.indexOf("?") > -1 ? "&" : "?"
-
-    url = this.baseURL + url + append + "callback=?"
+    url = this.baseURL + url
 
     var token = this.getToken()
 
     if (token) {
-      url += "&access_token=" + token
+      var append = url.indexOf("?") > -1 ? "&" : "?"
+
+      url += append + "access_token=" + token
     }
 
     return url
