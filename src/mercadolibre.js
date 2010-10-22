@@ -20,7 +20,7 @@ window.MercadoLibre = {
   },
 
   get: function(url, callback) {
-    Sroc.get(this._url(url), callback)
+    Sroc.get(this._url(url), {}, callback)
   },
 
   post: function(url, params, callback) {
