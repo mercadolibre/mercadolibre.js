@@ -9,7 +9,7 @@ Thread.new do
 end
 
 Capybara.default_driver = :selenium
-Capybara.app_host = "http://djanowski.dyndns.org:9393"
+Capybara.app_host = "http://localhost:8080"
 Capybara.run_server = false
 Capybara.default_selector = :css
 Capybara.default_wait_time = 60
