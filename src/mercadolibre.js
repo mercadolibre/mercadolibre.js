@@ -2,7 +2,7 @@
 
 window.MercadoLibre = {
   baseURL: "https://api.mercadolibre.com",
-  authorizationURL: "http://oauth.mercadolibre.com/jms/mla/authorization",
+  authorizationURL: "http://auth.mercadolibre.com/jms/mla/authorization",
 
   hash: {},
   callbacks: {},
