@@ -16,7 +16,7 @@ file "sroc.js" => "tmp" do |t|
 
   Dir.mktmpdir do |path|
     Dir.chdir(path) do
-      system "wget -q http://github.com/mercadolibre/sroc/tarball/master -O sroc.tar.gz"
+      system "wget --no-check-certificate -q https://github.com/mercadolibre/sroc/tarball/master -O sroc.tar.gz"
       system "tar xf sroc.tar.gz --strip 1"
       system "rake"
       system "cp pkg/sroc.js #{target}"
