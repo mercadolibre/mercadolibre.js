@@ -110,17 +110,20 @@ window.MercadoLibre = {
     var self = this
 
     var pairs = hash.split("&")
-    var i
 
-    for (i = 0; i < pairs.length; i++) {
-      var pair = pairs[i].match(/([A-Za-z_\-]+)=(.*)$/)
+    for (var i = 0; i < pairs.length; i++) {
+      var pair = null;
 
-      self.hash[pair[1]] = pair[2]
+      if (pair = pairs[i].match(/([A-Za-z_\-]+)=(.*)$/)) {
+        self.hash[pair[1]] = pair[2]
+      }
     }
 
-    cookie("access_token", this.hash.access_token)
+    if (this.hash.access_token) {
+      cookie("access_token", this.hash.access_token)
 
-    window.location.hash = ""
+      window.location.hash = ""
+    }
   },
 
   _popup: function(url) {

@@ -41,6 +41,12 @@ def test_data
   evaluate "window.testData"
 end
 
+test "does not interfere with the hash" do
+  visit "/test#foo=bar"
+
+  assert_equal "#foo=bar", evaluate("window.location.hash")
+end
+
 test "MercadoLibre object is available" do
   visit "/test"
 
@@ -52,8 +58,9 @@ test "Authentication and authorization" do
 
   evaluate <<-EOS
     MercadoLibre.requireLogin(function() {
-      MercadoLibre.get("/users/me", function(user) {
-        window.testData.user = user
+      MercadoLibre.get("/users/me", function(response) {
+        [status, headers, user] = response;
+        window.testData.user = user;
       })
     })
   EOS
