@@ -87,7 +87,7 @@ var cookie = function(name, value, options) {
     } else { // only name given, get cookie
         var cookieValue = null;
         if (document.cookie && document.cookie != '') {
-            var cookies = document.cookie.split(';');
+            var cookies = document.cookie.split(/; ?/);
             for (var i = 0; i < cookies.length; i++) {
                 // var cookie = jQuery.trim(cookies[i]);
                 var cookie = cookies[i];
