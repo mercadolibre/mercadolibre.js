@@ -1,6 +1,6 @@
 ;(function(cookie) {
 
-window.MercadoLibre = {
+var MercadoLibre = {
   baseURL: "https://api.mercadolibre.com",
   authorizationURL: "http://auth.mercadolibre.com/jms/mla/authorization",
 
@@ -146,5 +146,7 @@ window.MercadoLibre = {
 MercadoLibre._parseHash()
 
 MercadoLibre._checkPostAuthorization()
+
+window.MercadoLibre = MercadoLibre;
 
 })(cookie);
