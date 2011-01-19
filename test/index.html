@@ -1,18 +1,33 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <script src="../pkg/mercadolibre.js"></script>
-    <script type="text/javascript">
-      var testData = {}
-
-      MercadoLibre.init({
-        xd_url: "/test",
-        sandbox: true,
-        client_id: 1
-      })
-    </script>
+    <script src="jquery.js"></script>
+    <script src="mercadolibre.js"></script>
   </head>
 
   <body>
+    <a href="#login" id="login">Log in</a>
+    <span id="username"></span>
+
+    <script type="text/javascript">
+      $(function() {
+        MercadoLibre.init({
+          xd_url: "/xd.html",
+          client_id: 1
+        })
+
+        $("a[href='#login']").click(function() {
+          MercadoLibre.requireLogin(function() {
+            MercadoLibre.get("/users/me", function(response) {
+              var user = response[2];
+
+              $("#username").text(user.nickname);
+            })
+          });
+
+          return false;
+        });
+      });
+    </script>
   </body>
 </html>
