@@ -1,5 +1,7 @@
 ;(function(cookie) {
 
+var Sroc = window.Sroc;
+
 var MercadoLibre = {
   baseURL: "https://api.mercadolibre.com",
   authorizationURL: "http://auth.mercadolibre.com/jms/mla/authorization",
