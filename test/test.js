@@ -62,14 +62,13 @@ server.listen(8080, function() {
 
             var url = browser.window.document.innerHTML.match(/href="(.*)"/)[1];
 
-            browser.visit(url, function(_, browser) {
+            browser.window.location = url;
 
-              assert.ok(browser.window == browser.windows["mercadolibre-login"]);
-
+            browser.wait(function(err, browser) {
               browser.runScripts = true;
               browser.window.location.reload();
 
-              browser.wait(function(error, browser) {
+              browser.wait(function(err, browser) {
                 assert.equal(browser.text("#username", browser.windows[0].document), "TEST_GABY_ARGENTINA");
                 server.close();
               });
