@@ -46,6 +46,27 @@ task :test => :build do
   Cutest.run(Dir["test/test.rb"])
 end
 
+task :zombie do
+  sh "rm -rf vendor/zombie"
+  sh "mkdir vendor/zombie"
+
+  target = File.expand_path("vendor/zombie")
+
+  Dir.mktmpdir do |path|
+    Dir.chdir(path) do
+      sh "git clone https://github.com/djanowski/zombie.git -q"
+
+      Dir.chdir("zombie") do
+        sh "git checkout -q origin/integration"
+        sh "cake build"
+        sh "rm -rf src"
+        sh "cp package.json #{target}"
+        sh "cp -r lib #{target}"
+      end
+    end
+  end
+end
+
 task :release do
   `rm -rf pkg`
 

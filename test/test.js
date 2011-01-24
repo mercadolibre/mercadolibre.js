@@ -1,4 +1,4 @@
-require.paths.unshift("vendor/zombie");
+require.paths.unshift("vendor/zombie/lib");
 
 var zombie = require("index");
 var assert = require("assert");
