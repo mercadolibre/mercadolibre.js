@@ -18,6 +18,8 @@ var MercadoLibre = {
 
     this._checkPostAuthorization()
 
+    this._silentAuthorization();
+
     this._triggerSessionChange()
   },
 
@@ -47,9 +49,7 @@ var MercadoLibre = {
   },
 
   login: function() {
-    var xd_url = window.location.protocol + "//" + window.location.host + this.options.xd_url
-    var url = this.authorizationURL + "?redirect_uri=" + escape(xd_url) + "&response_type=token&client_id=" + this.options.client_id + "&state=iframe"
-    this._popup(url)
+    this._popup(this._authorizationURL(true));
   },
 
   bind: function(event, callback) {
@@ -73,8 +73,12 @@ var MercadoLibre = {
   },
 
   _loginComplete: function() {
-    this._popupWindow.close()
+    if (this._popupWindow) {
+      this._popupWindow.close();
+    }
+
     this._triggerSessionChange()
+
     if (this.pendingCallback) this.pendingCallback()
   },
 
@@ -85,8 +89,10 @@ var MercadoLibre = {
   // Check if we're returning from a redirect
   // after authentication inside an iframe.
   _checkPostAuthorization: function() {
-    if (this.hash.state && this.hash.state == "iframe") {
-      window.opener.MercadoLibre._loginComplete()
+    if (this.hash.state && this.hash.state == "iframe" && !this.hash.error) {
+      var p = window.opener || window.parent;
+
+      p.MercadoLibre._loginComplete()
     }
   },
 
@@ -142,6 +148,28 @@ var MercadoLibre = {
     else {
       this._popupWindow.focus()
     }
+  },
+
+  _silentAuthorization: function() {
+    this._iframe = document.createElement("iframe");
+    this._iframe.setAttribute("src", this._authorizationURL(false));
+    this._iframe.style.width = "0px";
+    this._iframe.style.height = "0px";
+    this._iframe.style.position = "absolute";
+    this._iframe.style.top = "-10px";
+    document.body.appendChild(this._iframe);
+  },
+
+  _authorizationURL: function(interactive) {
+    var xd_url = window.location.protocol + "//" + window.location.host + this.options.xd_url;
+
+    return this.authorizationURL +
+      "?redirect_uri=" + escape(xd_url) +
+      "&response_type=token" +
+      "&client_id=" + this.options.client_id +
+      "&state=iframe" +
+      "&display=popup" +
+      "&interactive=" + (interactive ? 1 : 0);
   }
 }
 
