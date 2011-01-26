@@ -41,11 +41,6 @@ end
 
 task :default => [:build, :minify]
 
-task :test => :build do
-  require "cutest"
-  Cutest.run(Dir["test/test.rb"])
-end
-
 task :zombie do
   sh "rm -rf vendor/zombie"
   sh "mkdir vendor/zombie"
