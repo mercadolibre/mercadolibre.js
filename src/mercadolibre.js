@@ -94,7 +94,7 @@ var Sroc = window.Sroc;
 
 var MercadoLibre = {
   baseURL: "https://api.mercadolibre.com",
-  authorizationURL: "http://auth-frontend.mercadolibre.com.ar/authorization",
+  authorizationURL: "http://auth.mercadolibre.com/authorization",
 
   hash: {},
   callbacks: {},
