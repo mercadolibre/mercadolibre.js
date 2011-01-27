@@ -4,6 +4,7 @@ require "erb"
 
 BUILD = [
   "vendor/cookie.js",
+  "vendor/des.js",
   "tmp/sroc.js",
   "src/mercadolibre.js",
 ]

@@ -78,30 +78,41 @@ server.listen(8080, function() {
               browser.wait(function() {
                 assert.equal(browser.text("#username", browser.windows[0].document), credentials.username);
 
-                // Clear cookies, check silent authorization.
+                var user_id = browser.text("#user_id", browser.windows[0].document);
+
+                assert.ok(user_id.length > 0);
+
+                // Make sure we're not sending the access token as a cookie.
+                // Simply check that our user_id is not readable.
+                var cookie = browser.cookies("mercadolibrejs.com", "/").get("access_token");
+                assert.ok(typeof(cookie) == "undefined" || cookie.indexOf(user_id) == -1);
+
+                // Clear cookies, check silent authorization after a page reload.
                 browser.cookies("mercadolibrejs.com", "/").clear();
-
-                // Make sure window.open is not called.
-                browser.createWindow = function() {
-                  var window = createWindow.apply(this, arguments);
-
-                  window.open = function() {
-                    throw "Didn't expect a window.open";
-                  }
-
-                  return window;
-                }
-
-                browser.window.open = function() {
-                  throw "Didn't expect a window.open";
-                }
 
                 browser.window.location.reload(true);
 
                 browser.wait(function() {
+                  // Make sure window.open is not called.
+                  browser.window.open = function() { throw "Didn't expect a window.open"; }
+
                   browser.clickLink("Log in", function(_, browser) {
-                    assert.equal(browser.text("#username", browser.windows[browser.windows.length - 1].document), credentials.username);
-                    server.close();
+                    //assert.equal(browser.text("#username", browser.windows[browser.windows.length - 1].document), credentials.username);
+
+                    // On browsers that support localStorage, multiple windows can read
+                    // the access token and issue authenticated calls with it.
+                    var tab = browser.open()
+
+                    browser.visit("http://mercadolibrejs.com:8080/#nosilent", function(_, browser) {
+                      // Everything should work without extra dialogs.
+                      browser.window.open = function() { throw "Didn't expect a window.open"; }
+
+                      browser.clickLink("Log in", function(_, browser) {
+                        assert.equal(browser.text("#username", tab.document), credentials.username);
+
+                        server.close();
+                      });
+                    });
                   });
                 });
               });

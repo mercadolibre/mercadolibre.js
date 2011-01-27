@@ -1,4 +1,94 @@
-;(function(cookie) {
+;(function(cookie, DESCipher, DESExtras) {
+
+var Store = function() {
+  this.map = {};
+
+  return this;
+}
+
+Store.localStorageAvailable = (function() {
+  try {
+    return ('localStorage' in window) && window.localStorage !== null;
+  }
+  catch(e) {
+    return false;
+  }
+})();
+
+if (Store.localStorageAvailable) {
+  Store.prototype.get = function(key) {
+    return window.localStorage.getItem(key);
+  }
+
+  Store.prototype.set = function(key, value) {
+    window.localStorage.setItem(key, value);
+  }
+
+  Store.prototype.getSecure = function(key) {
+    var secret = this.get(key + ".secret");
+    var crypto = cookie(key);
+
+    if (secret && secret != "" && crypto) {
+      var value = this._decrypt(secret, crypto);
+      var length = parseInt(this.get(key + ".length"));
+
+      return value.substring(0, length);
+    }
+
+    return undefined;
+  }
+
+  Store.prototype.setSecure = function(key, value, options) {
+    options = options || {};
+
+    var domain = options.domain ? options.domain : window.location.hostname;
+
+    var secret = this._generateSecret();
+
+    this.set(key + ".secret", secret);
+    this.set(key + ".length", value.length);
+
+    var crypto = this._encrypt(secret, value);
+
+    cookie(key, crypto, {"domain": domain});
+  }
+
+  Store.prototype._encrypt = function(secret, message) {
+    var crypto = DESCipher.des(secret, message, 1/*encrypt=true*/, 0/*vector ? 1 : 0*/, null/*vector*/);
+    crypto = DESExtras.stringToHex(crypto);
+    return crypto;
+  }
+
+  Store.prototype._decrypt = function(secret, crypto) {
+    var message = DESExtras.hexToString(crypto);
+    message = DESCipher.des(secret, message, 0/*encrypt=false*/, 0/*vector=false*/, null/*vector*/);
+    return message;
+  }
+
+  Store.prototype._generateSecret = function() {
+    var v = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+         'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
+         '1','2','3','4','5','6','7','8','9','0']
+
+    for(var j, x, i = v.length; i; j = parseInt(Math.random() * i), x = v[--i], v[i] = v[j], v[j] = x);
+
+    var secret = v.slice(0,8).join("");
+
+    return secret;
+  }
+}
+else {
+  Store.prototype.get = function(key) {
+    return this.map[key];
+  }
+
+  Store.prototype.set = function(key, value) {
+    this.map[key] = value;
+  }
+
+  Store.prototype.getSecure = Store.prototype.get;
+  Store.prototype.setSecure = Store.prototype.set;
+}
 
 var Sroc = window.Sroc;
 
@@ -8,15 +98,12 @@ var MercadoLibre = {
 
   hash: {},
   callbacks: {},
+  store: new Store(),
 
   init: function(options) {
     this.options = options
 
     if (this.options.sandbox) this.baseURL = this.baseURL.replace(/api\./, "sandbox.")
-
-    this._parseHash()
-
-    this._checkPostAuthorization()
 
     this._silentAuthorization();
 
@@ -32,7 +119,7 @@ var MercadoLibre = {
   },
 
   getToken: function() {
-    var token = cookie("access_token")
+    var token = this.store.getSecure("access_token");
     return (token && token.length > 0) ? token : null
   },
 
@@ -68,11 +155,15 @@ var MercadoLibre = {
   },
 
   logout: function() {
-    cookie("access_token", null)
+    this.store.setSecure("access_token", "");
     this._triggerSessionChange()
   },
 
-  _loginComplete: function() {
+  _loginComplete: function(hash) {
+    if (hash.access_token) {
+      this.store.setSecure("access_token", hash.access_token);
+    }
+
     if (this._popupWindow) {
       this._popupWindow.close();
     }
@@ -92,7 +183,7 @@ var MercadoLibre = {
     if (this.hash.state && this.hash.state == "iframe" && !this.hash.error) {
       var p = window.opener || window.parent;
 
-      p.MercadoLibre._loginComplete()
+      p.MercadoLibre._loginComplete(this.hash);
     }
   },
 
@@ -125,12 +216,6 @@ var MercadoLibre = {
       if (pair = pairs[i].match(/([A-Za-z_\-]+)=(.*)$/)) {
         self.hash[pair[1]] = pair[2]
       }
-    }
-
-    if (this.hash.access_token) {
-      cookie("access_token", this.hash.access_token)
-
-      window.location.hash = ""
     }
   },
 
@@ -179,4 +264,4 @@ MercadoLibre._checkPostAuthorization()
 
 window.MercadoLibre = MercadoLibre;
 
-})(cookie);
+})(cookie, DESCipher, DESExtras);
