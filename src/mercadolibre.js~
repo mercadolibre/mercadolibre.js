@@ -227,7 +227,7 @@ var MercadoLibre = {
       var top = parseInt((screen.availHeight - height) / 2);
 
       this._popupWindow = (window.open(url, "",
-        "toolbar=no,status=no,dependent=yes,dialog=yes,location=yes,menubar=no,resizable=no,scrollbars=no,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top + "screenX=" + left + ",screenY=" + top
+        "toolbar=no,status=no,location=yes,menubar=no,resizable=no,scrollbars=no,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top + "screenX=" + left + ",screenY=" + top
       ))
     }
     else {
