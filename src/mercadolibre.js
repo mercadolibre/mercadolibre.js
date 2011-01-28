@@ -226,9 +226,9 @@ var MercadoLibre = {
       var left = parseInt((screen.availWidth - width) / 2);
       var top = parseInt((screen.availHeight - height) / 2);
 
-      this._popupWindow = window.open(url, "mercadolibre-login",
-        "toolbar=no,dependent=yes,status=no,location=yes,menubar=no,resizable=no,scrollbars=no,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top + "screenX=" + left + ",screenY=" + top
-      )
+      this._popupWindow = (window.open(url, "_blank",
+        "toolbar=no,status=no,location=yes,menubar=no,resizable=no,scrollbars=no,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top + "screenX=" + left + ",screenY=" + top
+      ))
     }
     else {
       this._popupWindow.focus()
