@@ -76,8 +76,7 @@ if (Store.localStorageAvailable) {
 
     return secret;
   }
-}
-else {
+}else {
   Store.prototype.get = function(key) {
     return this.map[key];
   }
@@ -105,7 +104,7 @@ var MercadoLibre = {
 
     if (this.options.sandbox) this.baseURL = this.baseURL.replace(/api\./, "sandbox.")
 
-    this._silentAuthorization();
+    this._silentAuthorization()
 
     this._triggerSessionChange()
   },
@@ -119,7 +118,15 @@ var MercadoLibre = {
   },
 
   getToken: function() {
-    var token = this.store.getSecure("access_token");
+    var token = this.store.getSecure("access_token")
+    var expirationTime = this.store.get("expiration_time")
+    if(token && expirationTime){
+        var dateToExpire = new Date(parseInt(expirationTime))
+        var now = new Date()
+        if(dateToExpire <= now){
+          token = null
+        }
+    }
     return (token && token.length > 0) ? token : null
   },
 
@@ -162,6 +169,8 @@ var MercadoLibre = {
   _loginComplete: function(hash) {
     if (hash.access_token) {
       this.store.setSecure("access_token", hash.access_token);
+      var dateToExpire = new Date( new Date().getTime() + parseInt(hash.expires_in) * 1000 )
+      this.store.set("expiration_time", dateToExpire.getTime());
     }
 
     if (this._popupWindow) {
@@ -227,7 +236,7 @@ var MercadoLibre = {
       var top = parseInt((screen.availHeight - height) / 2);
 
       this._popupWindow = (window.open(url, "",
-        "toolbar=no,status=no,dependent=yes,dialog=yes,location=yes,menubar=no,resizable=no,scrollbars=no,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top + "screenX=" + left + ",screenY=" + top
+        "toolbar=no,status=no,location=yes,menubar=no,resizable=no,scrollbars=no,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top + "screenX=" + left + ",screenY=" + top
       ))
     }
     else {
