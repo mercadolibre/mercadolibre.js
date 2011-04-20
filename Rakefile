@@ -68,8 +68,9 @@ task :release do
 
   Git.each_tag do |tag|
     build tag, tag.sub(/^v/, "")
-    build "master", "edge"
   end
+
+  build "master", "edge"
 end
 
 def build(sha1, version)
