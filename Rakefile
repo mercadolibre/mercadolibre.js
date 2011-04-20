@@ -67,18 +67,21 @@ task :release do
   `rm -rf pkg`
 
   Git.each_tag do |tag|
-    version = tag.sub(/^v/, "")
-
-    stamp = Time.at(`git log #{tag} --format='%ct' -1`.to_i)
-    stamp = stamp.strftime("%Y%m%d%H%M.%S")
-
-    `rake`
-    `mv pkg/mercadolibre.js pkg/mercadolibre-#{version}.js`
-    `mv pkg/mercadolibre.min.js pkg/mercadolibre-#{version}.min.js`
-
-    `touch -t #{stamp} pkg/mercadolibre-#{version}.js`
-    `touch -t #{stamp} pkg/mercadolibre-#{version}.min.js`
+    build tag, tag.sub(/^v/, "")
+    build "master", "edge"
   end
+end
+
+def build(sha1, version)
+  stamp = Time.at(`git log #{sha1} --format='%ct' -1`.to_i)
+  stamp = stamp.strftime("%Y%m%d%H%M.%S")
+
+  `rake`
+  `mv pkg/mercadolibre.js pkg/mercadolibre-#{version}.js`
+  `mv pkg/mercadolibre.min.js pkg/mercadolibre-#{version}.min.js`
+
+  `touch -t #{stamp} pkg/mercadolibre-#{version}.js`
+  `touch -t #{stamp} pkg/mercadolibre-#{version}.min.js`
 end
 
 class Git
