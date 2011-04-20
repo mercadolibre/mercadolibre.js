@@ -50,7 +50,7 @@ if (Store.localStorageAvailable) {
 
     var crypto = this._encrypt(secret, value);
 
-    cookie(key, crypto, {"domain": domain});
+    cookie(key, crypto, {"domain": domain, "path": "/"});
   }
 
   Store.prototype._encrypt = function(secret, message) {
