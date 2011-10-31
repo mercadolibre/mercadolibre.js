@@ -1,4 +1,4 @@
-;(function(cookie, DESCipher, DESExtras) {
+;(function(cookie) {
 
 var Store = function() {
   this.map = {};
@@ -23,59 +23,8 @@ if (Store.localStorageAvailable) {
   Store.prototype.set = function(key, value) {
     window.localStorage.setItem(key, value);
   }
+  
 
-  Store.prototype.getSecure = function(key) {
-    var secret = this.get(key + ".secret");
-    var crypto = cookie(key);
-
-    if (secret && secret != "" && crypto) {
-      var value = this._decrypt(secret, crypto);
-      var length = parseInt(this.get(key + ".length"));
-
-      return value.substring(0, length);
-    }
-
-    return undefined;
-  }
-
-  Store.prototype.setSecure = function(key, value, options) {
-    options = options || {};
-
-    var domain = options.domain ? options.domain : window.location.hostname;
-
-    var secret = this._generateSecret();
-
-    this.set(key + ".secret", secret);
-    this.set(key + ".length", value.length);
-
-    var crypto = this._encrypt(secret, value);
-
-    cookie(key, crypto, {"domain": domain, "path": "/"});
-  }
-
-  Store.prototype._encrypt = function(secret, message) {
-    var crypto = DESCipher.des(secret, message, 1/*encrypt=true*/, 0/*vector ? 1 : 0*/, null/*vector*/);
-    crypto = DESExtras.stringToHex(crypto);
-    return crypto;
-  }
-
-  Store.prototype._decrypt = function(secret, crypto) {
-    var message = DESExtras.hexToString(crypto);
-    message = DESCipher.des(secret, message, 0/*encrypt=false*/, 0/*vector=false*/, null/*vector*/);
-    return message;
-  }
-
-  Store.prototype._generateSecret = function() {
-    var v = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-         'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
-         '1','2','3','4','5','6','7','8','9','0']
-
-    for(var j, x, i = v.length; i; j = parseInt(Math.random() * i), x = v[--i], v[i] = v[j], v[j] = x);
-
-    var secret = v.slice(0,8).join("");
-
-    return secret;
-  }
 }else {
   Store.prototype.get = function(key) {
     return this.map[key];
@@ -85,9 +34,8 @@ if (Store.localStorageAvailable) {
     this.map[key] = value;
   }
 
-  Store.prototype.getSecure = Store.prototype.get;
-  Store.prototype.setSecure = Store.prototype.set;
 }
+
 
 var Sroc = window.Sroc;
 
@@ -97,18 +45,78 @@ var MercadoLibre = {
 
   hash: {},
   callbacks: {},
+  loginCallbacks: [],
   store: new Store(),
+
 
   init: function(options) {
     this.options = options
 
     if (this.options.sandbox) this.baseURL = this.baseURL.replace(/api\./, "sandbox.")
-
-    this._silentAuthorization()
-
-    this._triggerSessionChange()
+    
+    _initXAuthData();
+    //getLoginStatus()
   },
 
+  /* Obtiene el status de login y llama a los 
+   * callbacks correspondientes con el status obtenido
+   */
+  getLoginStatus: function(callback){
+	  var loginStatus = this.getLocalLoginStatus();
+	  if (loginStatus == null) {
+		  this.loginCallbacks.push(callback);
+		  if (this.fetchingLoginStatus !=  true) {
+			  this.fetchingLoginStatus = true;
+			  var obj=this;
+			  XAuth.retrieve({
+				  retrieve: ["www.mercadolibre.com.ar"],
+				  callback: function(status) {obj.retrieveCallback(status)}
+			  });
+		  }
+	  } else callback(loginStatus);
+
+  },
+
+
+  storeLoginStatus: function(status){
+    //guardo en mi local storage el status
+    this.store.set("login_status", status);
+  },
+  
+  retrieveCallback: function(responseObj) {
+	var results = responseObj.tokens;
+	var cmd = responseObj.cmd.substr(5);
+	var tokens = []
+	for(var id in results) {
+		tokens.push(results[id]);
+	}
+	if (tokens.length == 0)
+		alert ('esto es un error, siempre deberia venir un status');
+	else {
+		this.storeLoginStatus(tokens[0]);
+		this.runLoginCallbacks(tokens[0]);
+	}
+			    
+
+  },
+  
+  runLoginCallbacks: function (status) {
+	  for (var func in this.loginCallbacks)
+		this.loginCallbacks[func](status);
+  },
+
+  getLocalLoginStatus: function() {
+	  //obtengo la clave
+	  var status = this.store.get("login_status");
+	  //valido con la cookie
+	  var validationCookie = cookie("orgid");
+	  if (status != null && validationCookie != null && status.hash == validationCookie)
+		return status;
+	  else
+		return null;
+		
+  },
+	//Sroc.get(www.ml.com/jms/$site_id/auth/login_status, {}, this.storeLoginStatus())
   get: function(url, callback) {
     Sroc.get(this._url(url), {}, callback)
   },
@@ -180,15 +188,27 @@ var MercadoLibre = {
     this._triggerSessionChange()
 
     if (this.pendingCallback) this.pendingCallback()
-  },
+  },=
 
   _triggerSessionChange: function() {
     this.trigger("session.change", [this.getToken() ? true : false])
   },
 
+  _initXAuthData: function() {
+    var p = window.opener || window.parent;
+    var xd_url = window.location.protocol + "//" + window.location.host + this.options.xd_url;
+    if (p && window.location.href == xd_url) {
+		if (this.getLocalLoginStatus() == null) {
+			//le pego a la api de status
+			//seteo el status y la cookie validadora
+		}
+  }
+
   // Check if we're returning from a redirect
   // after authentication inside an iframe.
   _checkPostAuthorization: function() {
+	  
+	
     if (this.hash.state && this.hash.state == "iframe" && !this.hash.error) {
       var p = window.opener || window.parent;
 
@@ -273,4 +293,4 @@ MercadoLibre._checkPostAuthorization()
 
 window.MercadoLibre = MercadoLibre;
 
-})(cookie, DESCipher, DESExtras);
+})(cookie);
