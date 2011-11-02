@@ -50,28 +50,31 @@
         xStoreCallbacks : [],
         authorizationStateCallbackInProgress : null,
         authorizationStateCallbacks : [],
-        appInfo: null,
-        initialized: false,
-        initializationCompleteCallbacks : [],
-        authorizationStateLoaded : false,
-        authorizationStateLoadedCallbacks : [],
-        
+        appInfo : null,
+        isAuthorizationStateAvaible : false,
+        authorizationStateAvailableCallbacks : [],
+
         init : function(options) {
             this.options = options;
 
             if (this.options.sandbox)
                 this.baseURL = this.baseURL.replace(/api\./, "sandbox.");
 
+            this._synchronizeAuthorizationState();
+        },
+        
+        _synchronizeAuthorizationState:function(){
             var authorizationState = this.store.get(AUTHORIZATION_STATE);
             var obj = this;
             // ( local storage is initialized, but it is not synchronized ) or
             // ( local storage isn't initialized, but synchronization cookie exists => we had already requested the authorizationState )
-            if ((authorizationState != null && authorizationState.hash != cookie("ath")) || (authorizationState == null && cookie("ath"))) {
+            if ((authorizationState != null && authorizationState.hash != cookie("ath")) || 
+                (authorizationState == null && cookie("ath"))) {
                 // synchronize it!
                 var onXStoreLoadedCallback = function() {
                     obj._retrieveFromXStore(obj.AUTHORIZATION_STATE, function(value) {
                         obj.store(obj.AUTHORIZATION_STATE, value);
-                        obj.onAuthorizationStateLoaded(value);
+                        obj._onAuthorizationStateAvailble(value);
                     });
                 };
                 this._loadXStore(onXStoreLoadedCallback);
@@ -82,11 +85,6 @@
                 };
                 this._loadXStore(onXStoreLoadedCallback);
             }
-            this.initialized = true;
-            var size = this.initializationCompleteCallbacks.length;
-            for ( var i = 0; i < size; i++) {
-                this.initializationCompleteCallbacks[i]();
-            }           
         },
 
         _loadXStore : function(onLoadFinishedCallback) {
@@ -123,27 +121,28 @@
         },
 
         _getRemoteAuthorizationState : function(callback) {
-            if(!this.authorizationStateCallbackInProgress){
+            if (!this.authorizationStateCallbackInProgress) {
                 this.authorizationStateCallbackInProgress = true;
                 this.authorizationStateCallbacks.push(callback);
-                if( this.appInfo == null){
+                if (this.appInfo == null) {
                     this._getApplicationInfo(this._internalGetRemoteAuthorizationState);
-                }else{
+                } else {
                     this._internalGetRemoteAuthorizationState();
                 }
             }
         },
-        
-        _getApplicationInfo: function(callback){
-            this.get("/applications/"+this.options.client_id, function(response, callback){
+
+        _getApplicationInfo : function(callback) {
+            this.get("/applications/" + this.options.client_id, function(response, callback) {
                 this.appInfo = response[2];
                 callback();
             });
         },
-        
-        _internalGetRemoteAuthorizationState : function(){
-             Sroc.get('https://www.mercadolibre.com/jms/'+this.appInfo.site_id.toLowerCase()+'/auth/authorization_state', 
-                    { 'client_id' : this.options.client_id }, this._onAuthorizationStateLoaded);
+
+        _internalGetRemoteAuthorizationState : function() {
+            Sroc.get('https://www.mercadolibre.com/jms/' + this.appInfo.site_id.toLowerCase() + '/auth/authorization_state', {
+                'client_id' : this.options.client_id
+            }, this._onAuthorizationStateLoaded);
         },
 
         _onAuthorizationStateLoaded : function(response) {
@@ -157,38 +156,38 @@
             });
             this._store(obj.AUTHORIZATION_STATE, response[2]);
             cookie("ath", response[2].hash);
-            //execute pending callbacks
+            // execute pending callbacks
             var size = this.authorizationStateCallbackInProgress.length;
             for ( var i = 0; i < size; i++) {
                 this.authorizationStateCallbacks[i](response[2]);
             }
             this.authorizationStateCallbackInProgress = false;
+            obj._onAuthorizationStateAvailble(response[2]);
         },
-        
-        _getAuthorizationState: function(callback){
-            if(this.initialized){
-                var obj = this;
-                var aux = function(){
-                    obj._getAuthorizationState(callback);
-                };
-                this.initializationCompleteCallbacks.push(aux);
-            }else{
-                //Se cargo el xStore
-                if(this.xStoreInitInProgress != null && !this.xStoreInitInProgress){
-                    //hay authorization_state?
-                    var authorizationState = this._retrieveFromXStore
-                    if( cookie("ath") ==  )
-                    //si existe la cookie y es la misma, hago el retrieve
-                    
-                    else{
-                        _getRemote
-                    }
-                    
-                    
-                }else{
-                    //
-                    
+
+        _onAuthorizationStateAvailable : function(authorizationState) {
+            var size = this.authorizationStateAvailableCallbacks.length;
+            for ( var i = 0; i < size; i++) {
+                this.authorizationStateAvailableCallbacks[i](authorizationState);
+            }
+            this.isAuthorizationStateAvaible = true;
+        },
+
+        _getAuthorizationState : function(callback) {
+            // Se cargo el xStore
+            if (this.isAuthorizationStateAvaible) {
+                // hay authorization_state
+                var authorizationState = this.store.get(key);
+                // Estoy actualizado?
+                if (authorizationState.hash == cookie("ath")) {
+                    callback(authorizationState);
+                } else {
+                    this.isAuthorizationStateAvaible = false;
+                    this.authorizationStateAvailableCallbacks.push(callback);
+                    this._synchronizeAuthorizationState();
                 }
+            }else{
+                this.authorizationStateAvailableCallbacks.push(callback);
             }
         },
 
@@ -267,6 +266,10 @@
 
             if (typeof (callbacks) == "undefined")
                 return
+
+            
+
+                        
 
             
 
