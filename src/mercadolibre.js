@@ -48,6 +48,8 @@ var MercadoLibre = {
   callbacks: {},
   loginCallbacks: [],
   store: new Store(),
+  initialized: false,
+  authorizationStateInitialized: false,
 
 
   init: function(options) {
@@ -65,7 +67,8 @@ var MercadoLibre = {
         //synchronize it!
 	onXStoreLoadedCallback = function() { 
           obj._retrieveFromXStore(obj.AUTHORIZATION_STATE, function(value){
-            obj.store(obj.AUTHORIZATION_STATE, value)
+            obj.store(obj.AUTHORIZATION_STATE, value);
+	    obj._loginAuthorizationStateLoaded(value);
 	  })
 	})
       }
@@ -80,10 +83,14 @@ var MercadoLibre = {
 		  extend: ["*"],
 		  callback: function(){}
 		})
+	  obj._onAuthorizationStateLoaded(response[2]);
 	  
 	})
       }
       //execute remoteGetLoginStatus as callback call "extend" method and store login_status
+    } else {
+      //authorizationState is present an syncronized
+      authorizationStateInitialized = true;
     }
     // print xAuth server pixel 
     this._loadXStore(onXStoreLoadedCallback)
@@ -108,13 +115,9 @@ var MercadoLibre = {
     this.xStore.retrieve({ retrieve: [client_id+key], callback: retrieveCallback });
   },
 
+  
   _getRemoteAuthorizationState: function(callback){
 	//Sroc get login_status, as callback => onLoginStatusLoaded 
-  },
-
-  _onLoginStatusLoaded: function(loginStatus, callback){
-	storeLoginStatus(loginStatus)
-	callback(loginStatus)
   },
 
   _storeLoginStatus: function(status){
@@ -164,19 +167,6 @@ var MercadoLibre = {
 
   post: function(url, params, callback) {
     Sroc.post(this._url(url), params, callback)
-  },
-
-  getToken: function() {
-    var token = this.store.getSecure("access_token")
-    var expirationTime = this.store.get("expiration_time")
-    if(token && expirationTime){
-        var dateToExpire = new Date(parseInt(expirationTime))
-        var now = new Date()
-        if(dateToExpire <= now){
-          token = null
-        }
-    }
-    return (token && token.length > 0) ? token : null
   },
 
   withLogin: function(successCallback, failureCallback, forceLogin) {
