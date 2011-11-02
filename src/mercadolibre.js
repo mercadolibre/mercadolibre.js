@@ -1,5 +1,5 @@
 ;
-(function(cookie) {
+(function(cookie, XAuth) {
 
     var Store = function() {
         this.map = {};
