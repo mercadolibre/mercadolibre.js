@@ -48,7 +48,8 @@
         appInfo : null,
         isAuthorizationStateAvaible : false,
         authorizationStateAvailableCallbacks : [],
-
+        authorizationStateCallbackInProgress : false,
+ 
         init : function(options) {
             this.options = options;
 
@@ -59,7 +60,8 @@
         },
         
         _synchronizeAuthorizationState:function(){
-            var authorizationState = this.store.get(AUTHORIZATION_STATE);
+	    var key = this.options.client_id + this.AUTHORIZATION_STATE;
+            var authorizationState = JSON.parse(this.store.get( key));
             var obj = this;
             // ( local storage is initialized, but it is not synchronized ) or
             // ( local storage isn't initialized, but synchronization cookie exists => we had already requested the authorizationState )
@@ -67,9 +69,18 @@
                 (authorizationState == null && cookie("ath"))) {
                 // synchronize it!
                 var onXStoreLoadedCallback = function() {
-                    obj._retrieveFromXStore(obj.AUTHORIZATION_STATE, function(value) {
-                        obj.store(obj.AUTHORIZATION_STATE, value);
-                        obj._onAuthorizationStateAvailble(value);
+                    obj._retrieveFromXStore( obj.options.client_id + obj.AUTHORIZATION_STATE, function(value) {
+			var key = obj.options.client_id + obj.AUTHORIZATION_STATE;
+			if (value.tokens[key] == null) {
+			  //hay un error, borro la cookie de ath
+			  cookie("ath", null);
+			  obj._loadXStore(function(){obj._getRemoteAuthorizationState(obj._onAuthorizationStateLoaded)});
+			} else {
+			  var authorizationState = value.tokens[key].data;
+			  authorizationState.expiration = value.tokens[key].expire;
+			  obj.store.set(key, JSON.stringify(authorizationState));
+			  obj._onAuthorizationStateAvailable(authorizationState);
+			}
                     });
                 };
                 this._loadXStore(onXStoreLoadedCallback);
@@ -79,14 +90,14 @@
                     obj._getRemoteAuthorizationState(obj._onAuthorizationStateLoaded);
                 };
                 this._loadXStore(onXStoreLoadedCallback);
-            }
+            } else this._onAuthorizationStateAvailable(authorizationState);
         },
 
         _loadXStore : function(onLoadFinishedCallback) {
             var iframe = document.createElement("iframe");
-            var url = "http://static.mlstatic.com/org-img/xAuthServer.js";
+            var url = "http://static.mlstatic.com/org-img/xAuthServer.htm";
             if (location.protocol == "https") {
-                url = "https://secure.mlstatic.com/org-img/xAuthServer.js";
+                url = "https://secure.mlstatic.com/org-img/xAuthServer.htm";
             }
             iframe.setAttribute("src", url);
             iframe.style.width = "0px";
@@ -97,7 +108,7 @@
         },
 
         _retrieveFromXStore : function(key, retrieveCallback) {
-            this.xStore.retrieve({
+            XAuth.retrieve({
                 retrieve : [ key ],
                 callback : retrieveCallback
             });
@@ -106,43 +117,61 @@
         _getRemoteAuthorizationState : function(callback) {
             if (!this.authorizationStateCallbackInProgress) {
                 this.authorizationStateCallbackInProgress = true;
-                this.authorizationStateCallbacks.push(callback);
+                this.authorizationStateAvailableCallbacks.push(callback);
+// 		var obj = this;
                 if (this.appInfo == null) {
-                    this._getApplicationInfo(this._internalGetRemoteAuthorizationState);
+                    this._getApplicationInfo();
                 } else {
                     this._internalGetRemoteAuthorizationState();
                 }
             }
         },
 
-        _getApplicationInfo : function(callback) {
-            this.get("/applications/" + this.options.client_id, function(response, callback) {
-                this.appInfo = response[2];
-                callback();
+        _getApplicationInfo : function() {
+	    var self = this;
+            this.get("/applications/" + this.options.client_id, function(response) {
+                self.appInfo = response[2];
+                self._internalGetRemoteAuthorizationState();
             });
         },
 
         _internalGetRemoteAuthorizationState : function() {
             var self = this;
-            Sroc.get('https://www.mercadolibre.com/jms/' + this.appInfo.site_id.toLowerCase() + '/auth/authorization_state', 
+	    if (document.domain.match(/(.*\.)?((mercadolibre\.com(\.(ar|ve|uy|ec|pe|co|pa|do|cr))?)|(mercadolibre\.cl)|(mercadolivre\.com\.br)|(mercadolivre\.pt))/) &&
+		cookie('orgapi') != null
+	       )
+	      self._onAuthorizationStateLoaded(
+		{
+		  status: 'AUTHORIZED',
+		  authorization_credential: {
+		    accessToken: cookie('orgapi'),
+		    expiresIn: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
+		    userID: cookie("orguserid")
+		},
+		hash: cookie("orgid")
+	      });
+		
+	    else {
+	      Sroc.get('https://www.mercadolibre.com/jms/' + this.appInfo.site_id.toLowerCase() + '/auth/authorization_state', 
                     {'client_id' : this.options.client_id}, function(){
                         var authorizationState = response[2];
                         self._onAuthorizationStateLoaded(authorizationState);
                     });
+	    }
         },
 
         _onAuthorizationStateLoaded : function(authorizationState) {
             XAuth.extend({
-                key : this.options.client_id + AUTHORIZATION_STATE,
-                data : authorizationState,
-                expire : new Date().getMilliseconds() + 10800 * 1000 /* expira en 3 hs */,
+                key : this.options.client_id + this.AUTHORIZATION_STATE,
+                data : JSON.stringify(authorizationState),
+                expire : new Date().getTime() + 10800 * 1000 /* expira en 3 hs */,
                 extend : [ "*" ],
                 callback : function() {
                 }
             });
-            this._store(obj.AUTHORIZATION_STATE, authorizationState);
+            this.store.set(this.options.client_id + this.AUTHORIZATION_STATE, JSON.stringify(authorizationState));
             cookie("ath", authorizationState.hash);
-            obj._onAuthorizationStateAvailble(authorizationState);
+            this._onAuthorizationStateAvailable(authorizationState);
         },
 
         _onAuthorizationStateAvailable : function(authorizationState) {
@@ -156,8 +185,9 @@
         _getAuthorizationState : function(callback) {
             // Se cargo el xStore
             if (this.isAuthorizationStateAvaible) {
+		var key = this.options.client_id + this.AUTHORIZATION_STATE;
                 // hay authorization_state
-                var authorizationState = this.store.get(key);
+                var authorizationState = JSON.parse(this.store.get(key));
                 // Estoy actualizado?
                 if (authorizationState.hash == cookie("ath")) {
                     callback(authorizationState);
@@ -180,21 +210,25 @@
         },
 
         getToken : function() {
-            var token = this.store.getSecure("access_token");
-            var expirationTime = this.store.get("expiration_time");
-            if (token && expirationTime) {
-                var dateToExpire = new Date(parseInt(expirationTime));
-                var now = new Date();
-                if (dateToExpire <= now) {
-                    token = null;
-                }
-            }
-            return (token && token.length > 0) ? token : null;
+	  var key = this.options.client_id + this.AUTHORIZATION_STATE;
+	  var authorizationState = JSON.parse(this.store.get(key));
+	  if (authorizationState != null && authorizationState.hash != null) {
+	    var token = authorizationState.hash;
+	    var expirationTime = authorizationState.expire;
+	    if (token && expirationTime) {
+		var dateToExpire = new Date(parseInt(expirationTime));
+		var now = new Date();
+		if (dateToExpire <= now) {
+		    token = null;
+		}
+	    }
+	    return (token && token.length > 0) ? token : null;
+	  } else return null;
         },
 
         withLogin : function(successCallback, failureCallback, forceLogin) {
             var self = this;
-            _getLoginStatus(function(authorizationState){
+            this._getAuthorizationState(function(authorizationState){
                 if(authorizationState.status == 'AUTHORIZED'){
                     successCallback();
                 }else if(forceLogin){
@@ -334,4 +368,4 @@
 
     window.MercadoLibre = MercadoLibre;
 
-})(cookie);
+})(cookie, XAuth);
