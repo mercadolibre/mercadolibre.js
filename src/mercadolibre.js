@@ -1,39 +1,163 @@
-;(function() {
+;(function(cookie) {
+
+var Store = function() {
+  this.map = {};
+
+  return this;
+}
+
+Store.localStorageAvailable = (function() {
+  try {
+    return ('localStorage' in window) && window.localStorage !== null;
+  }
+  catch(e) {
+    return false;
+  }
+})();
+
+if (Store.localStorageAvailable) {
+  Store.prototype.get = function(key) {
+    return window.localStorage.getItem(key);
+  }
+
+  Store.prototype.set = function(key, value) {
+    window.localStorage.setItem(key, value);
+  }
+  
+
+}else {
+  Store.prototype.get = function(key) {
+    return this.map[key];
+  }
+
+  Store.prototype.set = function(key, value) {
+    this.map[key] = value;
+  }
+
+}
+
 
 var Sroc = window.Sroc;
 
 var MercadoLibre = {
   baseURL: "https://api.mercadolibre.com",
   authorizationURL: "http://auth.mercadolibre.com/authorization",
+  AUTHORIZATION_STATE: "authorization_state",
 
   hash: {},
   callbacks: {},
+  loginCallbacks: [],
+  store: new Store(),
+
 
   init: function(options) {
     this.options = options
 
     if (this.options.sandbox) this.baseURL = this.baseURL.replace(/api\./, "sandbox.")
     
-    //inicializar xauth
-    //getLoginStatus()
+    var authorizationState = store.get(AUTHORIZATION_STATE)
+    var obj = this
+    var onXStoreLoadedCallback = null
+    // ( local storage is initialized, but it is not synchronized ) or
+    // ( local storage isn't initialized, but syncronization cookie exists => we had already requested the authorizationState )
+    if( ( authorizationState != null && authorizationState.hash != cookie("ath") ) ||
+	( authorizationState == null && cookie("ath") ) ){
+        //synchronize it!
+	onXStoreLoadedCallback = function() { 
+          obj._retrieveFromXStore(obj.AUTHORIZATION_STATE, function(value){
+            obj.store(obj.AUTHORIZATION_STATE, value)
+	  })
+	})
+      }
+    }else if ( authorizationState == null && !cookie("ath") ) {
+      // local storage isn't initialized and syncronization cookie doesn't exists => initialize cross storage
+      onXStoreLoadedCallback = function() { 
+        obj._getRemoteAuthorizationState(function(response){
+          XAuth.extend({
+		  key: this.options.client_id + AUTHORIZATION_STATE
+		  data: response[2],
+		  expire: new Date().getMilliseconds() + 10800 * 1000 /*expira en 3 hs*/,
+		  extend: ["*"],
+		  callback: function(){}
+		})
+	  
+	})
+      }
+      //execute remoteGetLoginStatus as callback call "extend" method and store login_status
+    }
+    // print xAuth server pixel 
+    this._loadXStore(onXStoreLoadedCallback)
   },
 
-  getLoginStatus: function(callback){
-    //xAuth.retrieve login_status == null
-	    //encolar requests << callback
-	    //if (login_status_call_in_progress != true)
-		    //login_status_call_in_progress = true
-		    //Sroc.get(www.ml.com/jms/$site_id/auth/login_status, {}, this.storeLoginStatus())
+  _loadXStore: function(onLoadFinishedCallback){
+    var iframe = document.createElement("iframe");
+    var url = "http://static.mlstatic.com/org-img/xAuthServer.js"
+    if(location.protocol == "https"){
+      url = "https://secure.mlstatic.com/org-img/xAuthServer.js"
+    }
+    iframe.setAttribute("src", url);
+    iframe.style.width = "0px";
+    iframe.style.height = "0px";
+    iframe.style.display = "none";
+    iframe.onload = onLoadFinishedCallback
+    document.body.appendChild(iframe);
+  },
 
+  _retrieveFromXStore: function(key, retrieveCallback) {
+    var client_id = this.options.client_id
+    this.xStore.retrieve({ retrieve: [client_id+key], callback: retrieveCallback });
+  },
+
+  _getRemoteAuthorizationState: function(callback){
+	//Sroc get login_status, as callback => onLoginStatusLoaded 
+  },
+
+  _onLoginStatusLoaded: function(loginStatus, callback){
+	storeLoginStatus(loginStatus)
+	callback(loginStatus)
+  },
+
+  _storeLoginStatus: function(status){
+    this.store.set("login_status", status);
+    //if(serverPixelLoadInProgress){
+	//callbacks << store
     //else
-	//callback(login_status)
+	//save the store extend
+  },
+  
+  _retrieveFromCentralizedStore2: function(key) {
+	var results = responseObj.tokens;
+	var cmd = responseObj.cmd.substr(5);
+	var tokens = []
+	for(var id in results) {
+		tokens.push(results[id]);
+	}
+	if (tokens.length == 0)
+		alert ('esto es un error, siempre deberia venir un status');
+	else {
+		this.storeLoginStatus(tokens[0]);
+		this.runLoginCallbacks(tokens[0]);
+	}
+  },
+  
+  runLoginCallbacks: function (status) {
+	  for (var func in this.loginCallbacks)
+		this.loginCallbacks[func](status);
   },
 
-  storeLoginStatus:function(){
-    //procesar respuesta de login_status
-    //usar la api de xAuth para store de login status
-  }
+  getLocalLoginStatus: function() {
+	  //obtengo la clave
+	  var status = this.store.get("login_status");
+	  //valido con la cookie
+	  var validationCookie = cookie("orgid");
+	  if (status != null && validationCookie != null && status.hash == validationCookie)
+		return status;
+	  else
+		return null;
 
+  },
+  
+  //Sroc.get(www.ml.com/jms/$site_id/auth/login_status, {}, this.storeLoginStatus())
   get: function(url, callback) {
     Sroc.get(this._url(url), {}, callback)
   },
@@ -55,8 +179,8 @@ var MercadoLibre = {
     return (token && token.length > 0) ? token : null
   },
 
-  requireLogin: function(callback) {
-    var token = this.getToken()
+  withLogin: function(successCallback, failureCallback, forceLogin) {
+    _getLoginStatus(callback)
 
     if (!token) {
       this.pendingCallback = callback
@@ -65,6 +189,16 @@ var MercadoLibre = {
     else {
       callback()
     }
+  },
+
+  funcionTrola: function(loginStatus, successCallback, failureCallback, forceLogin) {
+	if(loginStatus.status = ACTIVE)
+		successCallback()
+	else if (forceLogin){
+		showLogin(successCallback, failureCallback)
+	}else{
+	    	
+	}
   },
 
   login: function() {
@@ -91,35 +225,20 @@ var MercadoLibre = {
     this._triggerSessionChange()
   },
 
-  _loginComplete: function(hash) {
-    if (hash.access_token) {
-      this.store.setSecure("access_token", hash.access_token);
-      var dateToExpire = new Date( new Date().getTime() + parseInt(hash.expires_in) * 1000 )
-      this.store.set("expiration_time", dateToExpire.getTime());
-    }
-
-    if (this._popupWindow) {
-      this._popupWindow.close();
-    }
-
-    this._triggerSessionChange()
-
-    if (this.pendingCallback) this.pendingCallback()
-  },
-
   _triggerSessionChange: function() {
     this.trigger("session.change", [this.getToken() ? true : false])
   },
 
-  // Check if we're returning from a redirect
-  // after authentication inside an iframe.
-  _checkPostAuthorization: function() {
-    if (this.hash.state && this.hash.state == "iframe" && !this.hash.error) {
-      var p = window.opener || window.parent;
+  _initializeXAuthStore: function() {
+    var p = window.opener || window.parent;
+    var xd_url = window.location.protocol + "//" + window.location.host + this.options.xd_url;
+    if (p && window.location.href == xd_url) {
+		if (this.getLocalLoginStatus() == null) {
+			//le pego a la api de status
+			//seteo el status y la cookie validadora
+		}
+  }
 
-      p.MercadoLibre._loginComplete(this.hash);
-    }
-  },
 
   _url: function(url) {
     url = this.baseURL + url
@@ -153,6 +272,34 @@ var MercadoLibre = {
     }
   },
 
+  // Check if we're returning from a redirect
+  // after authentication inside an iframe.
+  _checkPostAuthorization: function() {
+    if (this.hash.state && this.hash.state == "iframe" && !this.hash.error) {
+      var p = window.opener || window.parent;
+
+      p.MercadoLibre._loginComplete(this.hash);
+    }
+  },
+
+  _loginComplete: function(hash) {
+    if (hash.access_token) {
+      this.store.setSecure("access_token", hash.access_token);
+      var dateToExpire = new Date( new Date().getTime() + parseInt(hash.expires_in) * 1000 )
+      this.store.set("expiration_time", dateToExpire.getTime());
+      
+      //aca guardar access_token usando orgapi
+    }
+
+    if (this._popupWindow) {
+      this._popupWindow.close();
+    }
+
+    this._triggerSessionChange()
+
+    if (this.pendingCallback) this.pendingCallback()
+  },
+
   _popup: function(url) {
     if (!this._popupWindow || this._popupWindow.closed) {
       var width = 830
@@ -167,16 +314,6 @@ var MercadoLibre = {
     else {
       this._popupWindow.focus()
     }
-  },
-
-  _silentAuthorization: function() {
-    this._iframe = document.createElement("iframe");
-    this._iframe.setAttribute("src", this._authorizationURL(false));
-    this._iframe.style.width = "0px";
-    this._iframe.style.height = "0px";
-    this._iframe.style.position = "absolute";
-    this._iframe.style.top = "-10px";
-    document.body.appendChild(this._iframe);
   },
 
   _authorizationURL: function(interactive) {
@@ -198,4 +335,5 @@ MercadoLibre._checkPostAuthorization()
 
 window.MercadoLibre = MercadoLibre;
 
-})();
+})(cookie);
+
