@@ -1,8 +1,8 @@
 var XAuth = (function () {
     var j = window;
     var q = !(j.postMessage && j.localStorage && j.JSON);
-    var n = "tioborracho.com.ar" ;
-    var e = "http://" + n + ":8080/testServer.html";
+    var n = "static.mlstatic.com" ;
+    var e = "http://" + n + ":8080/org-img/xAuthServer.htm";
     var g = null;
     var a = null;
     var p = {};
