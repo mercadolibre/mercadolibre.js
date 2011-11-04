@@ -59,14 +59,34 @@
             this._synchronizeAuthorizationState();
         },
         
+	_isValidLocalAuthState: function(authState) {
+	  //there is ath and stats
+	  if (!this._hasHash()) return true;//no hash, local value i
+	  else if (authState == false) return false; //hash but not initialized
+	  else { //hash and initialized, validate
+	    var value = cookie("ath");
+	    //tiene que estar el client id en la cookie
+	    var matched = value.match(eval("/\\|" + this.options.client_id + "\\=[^\\|]*\\|/"));
+	    if (matched == null || matched.length == 0) return true;
+	    //validate value against state
+	    var hashValue = matched[0].split("=")[1];
+	    return hashValue == authState.hash+"|";
+	  }
+	},
+	_hasHash: function() {
+	  var value = cookie("ath");
+	  if (value == null) return false;
+	  var matched = value.match(eval("/\\|" + this.options.client_id + "\\=[^\\|]*\\|/"));
+	  if (matched == null || matched.length == 0) return false;
+	  else return true;
+	},
         _synchronizeAuthorizationState:function(){
 	    var key = this.options.client_id + this.AUTHORIZATION_STATE;
             var authorizationState = JSON.parse(this.store.get( key));
             var obj = this;
             // ( local storage is initialized, but it is not synchronized ) or
             // ( local storage isn't initialized, but synchronization cookie exists => we had already requested the authorizationState )
-            if ((authorizationState != null && authorizationState.hash != cookie("ath")) || 
-                (authorizationState == null && cookie("ath"))) {
+            if (!this._isValidLocalAuthState(authorizationState)) {
                 // synchronize it!
                 var onXStoreLoadedCallback = function() {
                     obj._retrieveFromXStore( obj.options.client_id + obj.AUTHORIZATION_STATE, function(value) {
@@ -84,10 +104,10 @@
                     });
                 };
                 this._loadXStore(onXStoreLoadedCallback);
-            } else if (authorizationState == null && !cookie("ath")) {
+            } else if (authorizationState == null || !this._hasHash()) {
                 // local storage isn't initialized and synchronization cookie doesn't exists => initialize cross storage
                 var onXStoreLoadedCallback = function() {
-                    obj._getRemoteAuthorizationState(obj._onAuthorizationStateLoaded);
+                    obj._getRemoteAuthorizationState();
                 };
                 this._loadXStore(onXStoreLoadedCallback);
             } else this._onAuthorizationStateAvailable(authorizationState);
@@ -95,7 +115,7 @@
 
         _loadXStore : function(onLoadFinishedCallback) {
             var iframe = document.createElement("iframe");
-            var url = "http://static.mlstatic.com/org-img/xAuthServer.htm";
+            var url = "http://static.localhost.gz:8080/files/xAuthServer.htm";
             if (location.protocol == "https") {
                 url = "https://secure.mlstatic.com/org-img/xAuthServer.htm";
             }
@@ -134,21 +154,20 @@
                 self._internalGetRemoteAuthorizationState();
             });
         },
-
+	_isMELI: function () {
+	  return (document.domain.match(/(.*\.)?((mercadolibre\.com(\.(ar|ve|uy|ec|pe|co|pa|do|cr))?)|(mercadolibre\.cl)|(mercadolivre\.com\.br)|(mercadolivre\.pt))/) || document.domain.match(/.*localhost.*/))&& cookie('orgapi') != null
+	},
         _internalGetRemoteAuthorizationState : function() {
             var self = this;
-	    if (document.domain.match(/(.*\.)?((mercadolibre\.com(\.(ar|ve|uy|ec|pe|co|pa|do|cr))?)|(mercadolibre\.cl)|(mercadolivre\.com\.br)|(mercadolivre\.pt))/) &&
-		cookie('orgapi') != null
-	       )
+	    if (this._isMELI())
 	      self._onAuthorizationStateLoaded(
 		{
 		  status: 'AUTHORIZED',
 		  authorization_credential: {
-		    accessToken: cookie('orgapi'),
-		    expiresIn: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
-		    userID: cookie("orguserid")
-		},
-		hash: cookie("orgid")
+		    access_token: cookie('orgapi'),
+		    expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
+		    user_id: cookie("orguserid")
+		}
 	      });
 		
 	    else {
@@ -159,8 +178,27 @@
                     });
 	    }
         },
-
+	_updateATH: function () {
+	  //update ath value for the current client_id
+	  var actualValue = cookie("ath");
+	  var newHash = this._makeId(5);
+	  if (actualValue == null) actualValue = "|";
+	  //already hashed?
+	  var matcher = "/\\|" + this.options.client_id + "\\=[^\\|]*\\|/";
+	  if (actualValue.match(eval(matcher))) {
+	    //replace it with new hash
+	    actualValue.replace(eval(matcher), "|" + this.options.client_id + "=" + newHash + "|");
+	  } else {
+	    //add new hash
+	    actualValue = actualValue +this.options.client_id + "="+ newHash + "|";
+	  }
+	  cookie("ath", actualValue);
+	  return newHash;
+	  
+	},
         _onAuthorizationStateLoaded : function(authorizationState) {
+	    //generate a new hash for the authorization status
+	    authorizationState.hash = this._updateATH();
             XAuth.extend({
                 key : this.options.client_id + this.AUTHORIZATION_STATE,
                 data : JSON.stringify(authorizationState),
@@ -170,16 +208,15 @@
                 }
             });
             this.store.set(this.options.client_id + this.AUTHORIZATION_STATE, JSON.stringify(authorizationState));
-            cookie("ath", authorizationState.hash);
             this._onAuthorizationStateAvailable(authorizationState);
         },
 
         _onAuthorizationStateAvailable : function(authorizationState) {
-            var size = this.authorizationStateAvailableCallbacks.length;
+            this.isAuthorizationStateAvaible = true;
+	    var size = this.authorizationStateAvailableCallbacks.length;
             for ( var i = 0; i < size; i++) {
                 this.authorizationStateAvailableCallbacks[i](authorizationState);
             }
-            this.isAuthorizationStateAvaible = true;
         },
 
         _getAuthorizationState : function(callback) {
@@ -189,7 +226,7 @@
                 // hay authorization_state
                 var authorizationState = JSON.parse(this.store.get(key));
                 // Estoy actualizado?
-                if (authorizationState.hash == cookie("ath")) {
+                if (this._isValidLocalAuthState(authorizationState)) {
                     callback(authorizationState);
                 } else {
                     this.isAuthorizationStateAvaible = false;
@@ -202,6 +239,9 @@
         },
 
         get : function(url, callback) {
+	    var wrapper = function(response) {
+	      
+	    }
             Sroc.get(this._url(url), {}, callback);
         },
 
@@ -213,8 +253,8 @@
 	  var key = this.options.client_id + this.AUTHORIZATION_STATE;
 	  var authorizationState = JSON.parse(this.store.get(key));
 	  if (authorizationState != null && authorizationState.hash != null) {
-	    var token = authorizationState.hash;
-	    var expirationTime = authorizationState.expire;
+	    var token = authorizationState.authorization_credential.access_token;
+	    var expirationTime = authorizationState.authorization_credential.expires_in;
 	    if (token && expirationTime) {
 		var dateToExpire = new Date(parseInt(expirationTime));
 		var now = new Date();
@@ -342,6 +382,15 @@
                 this.pendingCallback();
         },
 
+	_makeId: function(chars) {
+	    var text = "";
+	    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+	    for( var i=0; i < chars; i++ )
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+
+	    return text;
+	},
         _popup : function(url) {
             if (!this._popupWindow || this._popupWindow.closed) {
                 var width = 830;
