@@ -47,84 +47,58 @@
         store : new Store(),
         appInfo : null,
         isAuthorizationStateAvaible : false,
+        authorizationState: {},
         authorizationStateAvailableCallbacks : [],
         authorizationStateCallbackInProgress : false,
+        synchronizationInProgress : false,
  
         init : function(options) {
             this.options = options;
 
-            if (this.options.sandbox)
+            if (this.options.sandbox) {
                 this.baseURL = this.baseURL.replace(/api\./, "sandbox.");
-
-            this._synchronizeAuthorizationState();
-        },
-        
-	_isValidLocalAuthState: function(authState) {
-	  //there is ath and stats
-	  if (!this._hasHash()) return true;//no hash, local value i
-	  else if (authState == false) return false; //hash but not initialized
-	  else { //hash and initialized, validate
-	    var value = cookie("ath");
-	    //tiene que estar el client id en la cookie
-	    var matched = value.match(eval("/\\|" + this.options.client_id + "\\=[^\\|]*\\|/"));
-	    if (matched == null || matched.length == 0) return true;
-	    //validate value against state
-	    var hashValue = matched[0].split("=")[1];
-	    return hashValue == authState.hash+"|";
-	  }
-	},
-	_hasHash: function() {
-	  var value = cookie("ath");
-	  if (value == null) return false;
-	  var matched = value.match(eval("/\\|" + this.options.client_id + "\\=[^\\|]*\\|/"));
-	  if (matched == null || matched.length == 0) return false;
-	  else return true;
-	},
-        _synchronizeAuthorizationState:function(){
-	    var key = this.options.client_id + this.AUTHORIZATION_STATE;
-            var authorizationState = JSON.parse(this.store.get( key));
-            var obj = this;
-            // ( local storage is initialized, but it is not synchronized ) or
-            // ( local storage isn't initialized, but synchronization cookie exists => we had already requested the authorizationState )
-            if (!this._isValidLocalAuthState(authorizationState)) {
-                // synchronize it!
-                var onXStoreLoadedCallback = function() {
-                    obj._retrieveFromXStore( obj.options.client_id + obj.AUTHORIZATION_STATE, function(value) {
-			var key = obj.options.client_id + obj.AUTHORIZATION_STATE;
-			if (value.tokens[key] == null) {
-			  //hay un error, borro la cookie de ath
-			  cookie("ath", null);
-			  obj._loadXStore(function(){obj._getRemoteAuthorizationState(obj._onAuthorizationStateLoaded)});
-			} else {
-			  var authorizationState = value.tokens[key].data;
-			  authorizationState.expiration = value.tokens[key].expire;
-			  obj.store.set(key, JSON.stringify(authorizationState));
-			  obj._onAuthorizationStateAvailable(authorizationState);
-			}
-                    });
-                };
-                this._loadXStore(onXStoreLoadedCallback);
-            } else if (authorizationState == null || !this._hasHash()) {
-                // local storage isn't initialized and synchronization cookie doesn't exists => initialize cross storage
-                var onXStoreLoadedCallback = function() {
-                    obj._getRemoteAuthorizationState();
-                };
-                this._loadXStore(onXStoreLoadedCallback);
-            } else this._onAuthorizationStateAvailable(authorizationState);
-        },
-
-        _loadXStore : function(onLoadFinishedCallback) {
-            var iframe = document.createElement("iframe");
-            var url = "http://static.localhost.gz:8080/files/xAuthServer.htm";
-            if (location.protocol == "https") {
-                url = "https://secure.mlstatic.com/org-img/xAuthServer.htm";
             }
-            iframe.setAttribute("src", url);
-            iframe.style.width = "0px";
-            iframe.style.height = "0px";
-            iframe.style.display = "none";
-            iframe.onload = onLoadFinishedCallback;
-            document.body.appendChild(iframe);
+            //No credentials needed on initialization. Just on-demand retrieval
+        },
+        _isExpired: function(authState) {
+          //credentials are expired if not present or expired
+          //for Meli there is a special case when credentials are only-identification. In that case are always expired
+          if (authState == null) {
+            return true;
+          }
+          if (authState.authorization_credential.onlyID)  {
+            return true;
+          }
+          var expirationTime = authState.authorization_credential.expires_in;
+          if (expirationTime) {
+            var dateToExpire = new Date(parseInt(expirationTime));
+            var now = new Date();
+            if (dateToExpire <= now) {
+              return true;
+            }
+          }
+          return false;
+        },
+        _synchronizeAuthorizationState:function(){
+          //Synchronizes with iFrame in static.mlstatic.com domain.
+
+          var key = this.options.client_id + this.AUTHORIZATION_STATE;
+          var obj = this;
+
+          //retrieves data from remote localStorage
+          obj._retrieveFromXStore( obj.options.client_id + obj.AUTHORIZATION_STATE, function(value) {
+            var key = obj.options.client_id + obj.AUTHORIZATION_STATE;
+            if (value.tokens[key] == null || obj._isExpired(value.tokens[key].data)) {
+              //no data from iFrame - call login_status api
+              obj._getRemoteAuthorizationState();
+            } else {
+              //save authState in local variable
+              var authState = value.tokens[key].data;
+              authState.expiration = value.tokens[key].expire;
+              obj.authorizationState[key] = authState;
+              obj._onAuthorizationStateAvailable(authState);
+            }
+          });
         },
 
         _retrieveFromXStore : function(key, retrieveCallback) {
@@ -134,125 +108,159 @@
             });
         },
 
-        _getRemoteAuthorizationState : function(callback) {
-            if (!this.authorizationStateCallbackInProgress) {
-                this.authorizationStateCallbackInProgress = true;
-                this.authorizationStateAvailableCallbacks.push(callback);
-// 		var obj = this;
-                if (this.appInfo == null) {
-                    this._getApplicationInfo();
-                } else {
-                    this._internalGetRemoteAuthorizationState();
-                }
+        _getRemoteAuthorizationState : function() {
+          //gets authorization state from api (https)
+          //if already in progress dismiss call and wait
+          if (!this.authorizationStateCallbackInProgress) {
+            this.authorizationStateCallbackInProgress = true;
+            if (this.appInfo == null) {
+                this._getApplicationInfo(); //this will call _internalGetRemoteAuthorizationState TODO: Should make it more error-safe
+            } else {
+                this._internalGetRemoteAuthorizationState();
             }
+          }
         },
 
         _getApplicationInfo : function() {
-	    var self = this;
+            var self = this;
+            //TODO: beware 304 status response
             this.get("/applications/" + this.options.client_id, function(response) {
                 self.appInfo = response[2];
                 self._internalGetRemoteAuthorizationState();
-            });
+            }, {"no-cache":true});
         },
-	_isMELI: function () {
-	  return (document.domain.match(/(.*\.)?((mercadolibre\.com(\.(ar|ve|uy|ec|pe|co|pa|do|cr))?)|(mercadolibre\.cl)|(mercadolivre\.com\.br)|(mercadolivre\.pt))/) || document.domain.match(/.*localhost.*/))&& cookie('orgapi') != null
-	},
+
+        _isMELI: function () {
+          //are we inside MELI?
+          return (document.domain.match(/(.*\.)?((mercadolibre\.com(\.(ar|ve|uy|ec|pe|co|pa|do|cr))?)|(mercadolibre\.cl)|(mercadolivre\.com\.br)|(mercadolivre\.pt))/) || document.domain.match(/.*localhost.*/))&& cookie('orgapi') != null;
+        },
+
         _internalGetRemoteAuthorizationState : function() {
-            var self = this;
-	    if (this._isMELI())
-	      self._onAuthorizationStateLoaded(
-		{
-		  status: 'AUTHORIZED',
-		  authorization_credential: {
-		    access_token: cookie('orgapi'),
-		    expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
-		    user_id: cookie("orguserid")
-		}
-	      });
-		
-	    else {
-	      Sroc.get('https://www.mercadolibre.com/jms/' + this.appInfo.site_id.toLowerCase() + '/auth/authorization_state', 
-                    {'client_id' : this.options.client_id}, function(){
-                        var authorizationState = response[2];
-                        self._onAuthorizationStateLoaded(authorizationState);
-                    });
-	    }
-        },
-	_updateATH: function () {
-	  //update ath value for the current client_id
-	  var actualValue = cookie("ath");
-	  var newHash = this._makeId(5);
-	  if (actualValue == null) actualValue = "|";
-	  //already hashed?
-	  var matcher = "/\\|" + this.options.client_id + "\\=[^\\|]*\\|/";
-	  if (actualValue.match(eval(matcher))) {
-	    //replace it with new hash
-	    actualValue.replace(eval(matcher), "|" + this.options.client_id + "=" + newHash + "|");
-	  } else {
-	    //add new hash
-	    actualValue = actualValue +this.options.client_id + "="+ newHash + "|";
-	  }
-	  cookie("ath", actualValue);
-	  return newHash;
-	  
-	},
-        _onAuthorizationStateLoaded : function(authorizationState) {
-	    //generate a new hash for the authorization status
-	    authorizationState.hash = this._updateATH();
-            XAuth.extend({
-                key : this.options.client_id + this.AUTHORIZATION_STATE,
-                data : JSON.stringify(authorizationState),
-                expire : new Date().getTime() + 10800 * 1000 /* expira en 3 hs */,
-                extend : [ "*" ],
-                callback : function() {
+          //gets authorization state with client id loaded
+          var self = this;
+            //TODO: change when api is ready. Uses cookies instead of real api call
+            //TODO: what happens ig no orgapi present????
+          if (this._isMELI()) {
+            self._onAuthorizationStateLoaded(
+              {
+                status: 'AUTHORIZED',
+                authorization_credential: {
+                  access_token: cookie('orgapi'),
+                  expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
+                  user_id: cookie("orguserid")
                 }
-            });
-            this.store.set(this.options.client_id + this.AUTHORIZATION_STATE, JSON.stringify(authorizationState));
-            this._onAuthorizationStateAvailable(authorizationState);
+              });
+          } else {
+              Sroc.get('https://www.mercadolibre.com/jms/' + this.appInfo.site_id.toLowerCase() + '/auth/authorization_state',
+                {'client_id' : this.options.client_id}, function(){
+                    var authorizationState = response[2];
+                    self._onAuthorizationStateLoaded(authorizationState);
+                });
+            }
+        },
+
+        _onAuthorizationStateLoaded : function(authorizationState) {
+        //TODO: This code should be moved to xd.htm
+          //save new auth state in iFrame
+          XAuth.extend({
+            key : this.options.client_id + this.AUTHORIZATION_STATE,
+            data : JSON.stringify(authorizationState),
+            expire : new Date().getTime() + 10800 * 1000 /* expira en 3 hs */,
+            extend : [ "*" ]
+          });
+          this.authorizationState[this.options.client_id + this.AUTHORIZATION_STATE]= authorizationState;
+          this.isAuthorizationStateAvaible = false;
+          this._onAuthorizationStateAvailable(authorizationState);
+        },
+
+        _getIdState: function() {
+           return ({
+             status: 'AUTHORIZED',
+             authorization_credential: {
+               access_token: cookie('orgid'),
+               expires_in: 0,
+               onlyID: true
+             }
+           });
         },
 
         _onAuthorizationStateAvailable : function(authorizationState) {
-            this.isAuthorizationStateAvaible = true;
-	    var size = this.authorizationStateAvailableCallbacks.length;
-            for ( var i = 0; i < size; i++) {
-                this.authorizationStateAvailableCallbacks[i](authorizationState);
-            }
+          //all callbacks waiting for authorizationState
+          this.isAuthorizationStateAvaible = true;
+          var size = this.authorizationStateAvailableCallbacks.length;
+          for ( var i = 0; i < size; i++) {
+              this.authorizationStateAvailableCallbacks[i](authorizationState);
+          }
         },
 
-        _getAuthorizationState : function(callback) {
-            // Se cargo el xStore
-            if (this.isAuthorizationStateAvaible) {
-		var key = this.options.client_id + this.AUTHORIZATION_STATE;
-                // hay authorization_state
-                var authorizationState = JSON.parse(this.store.get(key));
-                // Estoy actualizado?
-                if (this._isValidLocalAuthState(authorizationState)) {
-                    callback(authorizationState);
-                } else {
-                    this.isAuthorizationStateAvaible = false;
-                    this.authorizationStateAvailableCallbacks.push(callback);
-                    this._synchronizeAuthorizationState();
-                }
-            }else{
+        _getAuthorizationState : function(callback, onlyID) {
+          // credentials valid or MELI + orgid
+          if (this.isAuthorizationStateAvaible || (this._isMELI() && onlyID && cookie("orgid"))) {
+              var key = this.options.client_id + this.AUTHORIZATION_STATE;
+              //TODO: Check expiration
+              if (this.authorizationState[key] != null && !this._isExpired(this.authorizationState[key])) {
+                  callback(this.authorizationState[key]);
+              } else if (this._isMELI() && onlyID && cookie("orgid")) {
+                this.authorizationState[key] = this._getIdState();
+                callback( this._getIdState());
+              } else {
+                //expired credentials, resynchronuze pushing this action
+                this.isAuthorizationStateAvaible = false;
                 this.authorizationStateAvailableCallbacks.push(callback);
-            }
+                this._synchronizeAuthorizationState();
+              }
+          }else{
+              this.authorizationStateAvailableCallbacks.push(callback);
+              this._synchronizeAuthorizationState();
+          }
         },
 
-        get : function(url, callback) {
-	    var wrapper = function(response) {
-	      
-	    }
-            Sroc.get(this._url(url), {}, callback);
+        _partial: function (func /* , 0..n args */ ) {
+          var args = Array.prototype.slice.call(arguments, 1);
+          return function () {
+            var allArguments = args.concat(Array.prototype.slice.call(arguments));
+            return func.apply(this, allArguments);
+          };
+        },
+        _wrap: function (callback) {
+          var key = this.options.client_id + this.AUTHORIZATION_STATE;
+          var self=this;
+          var wrapper = function(response) {
+            //check if token is invalid
+           
+            var properCallback = self._partial(callback, response);
+            if (response[0] != 200 && response[2].error != null && response[2].error.match(/.*(token|OAuth).*/)) {
+              self.isAuthorizationStateAvaible = false;
+              //delete token
+              XAuth.expire({key:key, callback: properCallback});
+        
+            } else {
+              properCallback();
+            }
+          };
+          return wrapper;
+        },
+        get : function(url, callback, params) {
+          //no cache params
+          Sroc.get(this._url(url, params), {}, this._wrap(callback));
         },
 
         post : function(url, params, callback) {
-            Sroc.post(this._url(url), params, callback);
+          Sroc.post(this._url(url), params, this._wrap(callback));
+        },
+
+        remove : function(url, params, callback) {
+          if (!params) {
+            params = {};
+          }
+          params._method = "DELETE";
+          Sroc.get(this._url(url, params), params, this._wrap(callback));
         },
 
         getToken : function() {
 	  var key = this.options.client_id + this.AUTHORIZATION_STATE;
-	  var authorizationState = JSON.parse(this.store.get(key));
-	  if (authorizationState != null && authorizationState.hash != null) {
+	  var authorizationState = this.authorizationState[key];
+	  if (authorizationState != null) {
 	    var token = authorizationState.authorization_credential.access_token;
 	    var expirationTime = authorizationState.authorization_credential.expires_in;
 	    if (token && expirationTime) {
@@ -263,10 +271,12 @@
 		}
 	    }
 	    return (token && token.length > 0) ? token : null;
-	  } else return null;
+	  } else {
+            return null;
+          }
         },
 
-        withLogin : function(successCallback, failureCallback, forceLogin) {
+        withLogin : function(successCallback, failureCallback, forceLogin, onlyID) {
             var self = this;
             this._getAuthorizationState(function(authorizationState){
                 if(authorizationState.status == 'AUTHORIZED'){
@@ -275,9 +285,11 @@
                     self.pendingCallback = successCallback;
                     self.login();
                 }else{
-                    failureCallback();
+                    if (failureCallback) {
+                      failureCallback();
+                    }
                 }
-            });
+            }, onlyID);
         },
 
         login : function() {
@@ -293,9 +305,9 @@
         trigger : function(event, args) {
             var callbacks = this.callbacks[event];
 
-            if (typeof (callbacks) == "undefined")
-                return
-                
+            if (typeof (callbacks) == "undefined") {
+                return;
+            }
             for ( var i = 0; i < callbacks.length; i++) {
                 callbacks[i].apply(null, args);
             }
@@ -310,8 +322,19 @@
             this.trigger("session.change", [ this.getToken() ? true : false ]);
         },
 
-        _url : function(url) {
+        _url : function(url, params) {
             url = this.baseURL + url;
+            var urlParams = "";
+            if (params) {
+              for(var key in params){
+                if (urlParams.length > 0) {
+                  urlParams += "&";
+                }
+                if (key == "no-cache" && params[key])
+                  params[key] = Math.random()*Math.random();
+                urlParams += key + "=" + params[key];
+              }
+            }
 
             var token = this.getToken();
 
@@ -320,6 +343,10 @@
 
                 url += append + "access_token=" + token;
             }
+            if (urlParams.length > 0) {
+                append = url.indexOf("?") > -1 ? "&" : "?";
+                url += append + urlParams;
+            }
 
             return url;
         },
@@ -327,8 +354,9 @@
         _parseHash : function() {
             var hash = window.location.hash.substr(1);
 
-            if (hash.length == 0)
+            if (hash.length == 0) {
                 return;
+            }
 
             var self = this;
 
@@ -382,15 +410,6 @@
                 this.pendingCallback();
         },
 
-	_makeId: function(chars) {
-	    var text = "";
-	    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-	    for( var i=0; i < chars; i++ )
-		text += possible.charAt(Math.floor(Math.random() * possible.length));
-
-	    return text;
-	},
         _popup : function(url) {
             if (!this._popupWindow || this._popupWindow.closed) {
                 var width = 830;
