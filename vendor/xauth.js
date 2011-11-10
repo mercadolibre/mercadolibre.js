@@ -103,6 +103,7 @@ var XAuth = (function () {
         }
         var s = {
             cmd: "xauth::expire",
+            key: r.key || null,
             callback: r.callback || null
         };
         h(s)
