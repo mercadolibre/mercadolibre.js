@@ -2,7 +2,7 @@ var XAuth = (function () {
     var j = window;
     var q = !(j.postMessage && j.localStorage && j.JSON);
     var data = {
-      n: "static.localhost.gz",
+      n: "static.mercadolibre.com.ar",
       xdp: "/xd.html",
       port: ""
     }
@@ -47,6 +47,9 @@ var XAuth = (function () {
         } else if (t.cmd == "meli::loginComplete") {
           MercadoLibre._loginComplete();
           return;
+        } else if (t.cmd == "meli::authComplete") {
+          MercadoLibre._authComplete();
+          return;
         }
         var r = p[t.id];
         if (r) {
@@ -60,10 +63,12 @@ var XAuth = (function () {
     }
     function i() {
         if (g || a) {
+            g.src = this.data?this.data.e:data.e;
             return
         }
         var s = j.document;
         g = s.createElement("iframe");
+        g.id = "xauthIFrame";
         var r = g.style;
         r.position = "absolute";
         r.left = r.top = "-999px";
