@@ -41,6 +41,8 @@
         baseURL : "https://api.mercadolibre.com",
         authorizationURL : "http://auth.mercadolibre.com/authorization",
         authorizationStateURL : "https://auth.mercadolibre.com/jms/SITE/oauth/authorization/state",
+        //authorizationStateURL : "https://auth.mercadolibre.com.ar/authorization/index",
+  
         AUTHORIZATION_STATE : "authorization_state",
 
         hash : {},
@@ -57,14 +59,19 @@
         init : function(options) {
             this.options = options;
 
-            if (this.options.sandbox) {
+            if (this.options.sandbox) 
                 this.baseURL = this.baseURL.replace(/api\./, "sandbox.");
-            }
-            if (this.options.xauth_domain)
-              XAuth.data.n = this.options.xauth_domain;
-            if (this.options.xd_url)
-              XAuth.data.p = this.options.xd_url;
-            XAuth.init();
+            
+            if (!this.options.xauth_domain)
+              this.options.xauth_domain = "static.mercadolibre.com.ar";
+              
+            if (!this.options.xd_url)
+              this.options.xd_url = "/xd.html";
+            
+            XAuth.data.n = this.options.xauth_domain;
+            XAuth.data.p = this.options.xd_url;
+            if (window === window.top)
+              XAuth.init();
             //No credentials needed on initialization. Just on-demand retrieval
         },
         _isExpired: function(authState) {
@@ -211,6 +218,7 @@
           //all callbacks waiting for authorizationState
           this.authorizationStateCallbackInProgress = false;
           this.isAuthorizationStateAvaible = true;
+          this._triggerSessionChange();
           while (this.authorizationStateAvailableCallbacks.length > 0){
             var callback = this.authorizationStateAvailableCallbacks.shift();
             callback(authorizationState);
@@ -345,9 +353,24 @@
         login : function() {
             this._popup(this._authorizationURL(true));
         },
-  
+        _iframe: function(url, id) {
+          if (!id)
+            id = "xauthIFrame";
+          var iframe = $("#" + id);
+          if (!iframe || iframe.length == 0) {
+            var elem = window.document.createElement("iframe");
+            var r = elem.style;
+            r.position = "absolute";
+            r.left = r.top = "-999px";
+            elem.id = id;
+            window.document.body.appendChild(elem);
+            elem.src = url;
+          } else
+            iframe[0].src=url;
+          
+        },
         _authorize: function () {
-          this._popup(this._authorizationStateURL());
+          this._iframe(this._authorizationStateURL());
         },
         bind : function(event, callback) {
             if (typeof (this.callbacks[event]) == "undefined")
@@ -367,14 +390,20 @@
         },
 
         logout : function() {
-            this.store.setSecure("access_token", "");
-            this._triggerSessionChange();
+          //expire xauth key
+          XAuth.expire({key:this._getKey()});
+          this.authorizationState[this._getKey()]=null;
+          //logout from meli
+          this._iframe('http://www.mercadolibre.com.ar/jm/logout', "logoutFrame");
+          this._triggerSessionChange();
         },
 
         _triggerSessionChange : function() {
             this.trigger("session.change", [ this.getToken() ? true : false ]);
         },
-
+        getSession: function() {
+          return this.authorizationState[this._getKey()];
+        },
         _url : function(url, params) {
             url = this.baseURL + url;
             var urlParams = "";
@@ -455,14 +484,21 @@
                 }));
 
               }
-              //p.MercadoLibre._loginComplete();
               p.postMessage(JSON.stringify({cmd:"meli::loginComplete"}), "*");
             } else if (this.hash.state) {
               var p = window.opener || window.parent;
               authorizationState = this.hash;
               var key = this.hash.client_id + this.AUTHORIZATION_STATE;
-              var expiration = new Date().getTime() + this.hash.authorization_info.expires_in* 1000
-              this.hash.authorization_info.expires_in = expiration;
+              if (!this.hash.authorization_info && this.hash.state == "UNKNOWN") {
+                this.hash.authorization_info =  {
+                  access_token: null,
+                  expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
+                  user_id: null
+                }
+              } else {
+                var expiration = new Date().getTime() + (this.hash.authorization_info ? this.hash.authorization_info.expires_in* 1000 : 0);
+                this.hash.authorization_info.expires_in = expiration;
+              }
               this.store.set(key, JSON.stringify({
                 key : key,
                 data : authorizationState,
@@ -470,15 +506,17 @@
                 extend : [ "*" ]
               }));
               //p.MercadoLibre._loginComplete();
-              p.postMessage(JSON.stringify({cmd:"meli::loginComplete"}), "*");
+              p.postMessage(JSON.stringify({cmd:"meli::authComplete"}), "*");
             }
-            else XAuth.init();
+            else  if (window === window.top) XAuth.init();
         },
 
         _loginComplete : function() {
             if (this._popupWindow) {
-                if (this._popupWindow.type && this._popupWindow.type == "modal")
+                if (this._popupWindow.type && this._popupWindow.type == "modal") {
                         this._popupWindow.hide();
+                        this._popupWindow = null;
+                }
                 else
                         this._popupWindow.close();
             }
@@ -494,6 +532,14 @@
            });
            this._synchronizeAuthorizationState(false);
           
+        },
+        _authComplete : function() {
+           //update our authorization credentials
+           var self = this;
+           this.authorizationStateAvailableCallbacks.push(function(authState) {
+              self._triggerSessionChange();
+           });
+           this._synchronizeAuthorizationState(false);
         },
 
         _popup : function(url) {
@@ -514,14 +560,24 @@
                 this._popupWindow.show();*/
             }
         },
-
+        _getKey: function() {
+          var key = null;
+          try {
+            key = this.options.client_id + this.AUTHORIZATION_STATE;
+          } catch (Error) {
+            key = "";
+          }
+          return key;
+          
+        },
         _authorizationStateURL: function() {
-          return this.authorizationStateURL.replace("SITE", this.appInfo.site_id.toLowerCase()) + "?client_id=" + this.options.client_id;
+          var xd_url = "http://" + this.options.xauth_domain + this.options.xd_url;
+          return this.authorizationStateURL.replace("SITE", this.appInfo.site_id.toLowerCase()) + "?client_id=" + this.options.client_id + "&redirect_uri=" + encodeURIComponent(xd_url) + "&response_type=token";
         },
         _authorizationURL : function(interactive) {
-            var xd_url = window.location.protocol + "//" + window.location.host + this.options.xd_url;
+            var xd_url = "http://" + this.options.xauth_domain + this.options.xd_url;
 
-            return this.authorizationURL + "?redirect_uri=" + escape(xd_url) + "&response_type=token" + "&client_id=" + this.options.client_id + "&state=iframe" + "&display=popup" + "&interactive=" + (interactive ? 1 : 0);
+            return this.authorizationURL + "?redirect_uri=" + encodeURIComponent(xd_url) + "&response_type=token" + "&client_id=" + this.options.client_id + "&state=iframe" + "&display=popup" + "&interactive=" + (interactive ? 1 : 0);
         }
     };
 
