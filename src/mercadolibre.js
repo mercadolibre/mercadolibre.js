@@ -40,7 +40,7 @@
     var MercadoLibre = {
         baseURL : "https://api.mercadolibre.com",
         authorizationURL : "http://auth.mercadolibre.com/authorization",
-        authorizationStateURL : "https://auth.mercadolibre.com/jms/SITE/oauth/authorization/state",
+        authorizationStateURL : "https://www.mercadolibre.com/jms/SITE/oauth/authorization/state",
         //authorizationStateURL : "https://auth.mercadolibre.com.ar/authorization/index",
   
         AUTHORIZATION_STATE : "authorization_state",
@@ -63,7 +63,7 @@
                 this.baseURL = this.baseURL.replace(/api\./, "sandbox.");
             
             if (!this.options.xauth_domain)
-              this.options.xauth_domain = "static.mercadolibre.com.ar";
+              this.options.xauth_domain = "static.mlstatic.com";
               
             if (!this.options.xd_url)
               this.options.xd_url = "/xd.html";
@@ -147,7 +147,7 @@
 
         _isMELI: function () {
           //are we inside MELI?
-          return (document.domain.match(/(.*\.)?((mercadolibre\.com(\.(ar|ve|uy|ec|pe|co|pa|do|cr))?)|(mercadolibre\.cl)|(mercadolivre\.com\.br)|(mercadolivre\.pt))/) || document.domain.match(/.*localhost.*/))&& cookie('orgapi') != null;
+          return (document.domain.match(/(.*\.)?((mercadolibre\.com(\.(ar|ve|uy|ec|pe|co|pa|do|cr))?)|(mercadolibre\.cl)|(mercadolivre\.com\.br)|(mercadolivre\.pt))/) || document.domain.match(/.*localhost.*/));
         },
 
         _internalGetRemoteAuthorizationState : function() {
@@ -155,7 +155,7 @@
           var self = this;
             //TODO: change when api is ready. Uses cookies instead of real api call
             //TODO: what happens ig no orgapi present????
-          if (this._isMELI()) {
+          if (this._isMELI() && cookie('orgapi') != null) {
             self._onAuthorizationStateLoaded(
               {
                 state: 'AUTHORIZED',
@@ -255,7 +255,7 @@
           };
         },
 
-        _wrap: function (callback, url, retry, method, params) {
+        _wrap: function (callback, url, retry, method, params, next) {
           var key = this.options.client_id + this.AUTHORIZATION_STATE;
           var self=this;
           var wrapper = function(response) {
@@ -264,7 +264,7 @@
             var success = function() {
               //se pudo loguear, vuelvo a llamar al get
               if (method == "get")
-                Sroc.get( self._url(url, params), {}, self._wrap( callback,url, false, method));
+                Sroc.get( self._url(url, params), params, self._wrap( callback,url, false, method));
               else if (method == "post") {}
             };
             var failure = function () {
@@ -290,9 +290,12 @@
           };
           return wrapper;
         },
-        get : function(url, params, callback) {
+        get : function(url, params, callback, next) {
           //no cache params
-          Sroc.get(this._url(url, params), params, this._wrap(callback, url, true, "get", params));
+          if (!next)
+            next = this._wrap(callback, url, true, "get", params, next);
+
+          Sroc.get(this._url(url, params), params, next);
         },
 
         post : function(url, params, callback) {
@@ -329,10 +332,10 @@
             return null;
           }
         },
-        getLoginStatus : function (callback) {
+        getLoginStatus : function (callback, onlyID) {
             this._getAuthorizationState(function(authorizationState){
               callback(authorizationState);
-            });
+            }, onlyID);
         },
         withLogin : function(successCallback, failureCallback, forceLogin, onlyID) {
             var self = this;
@@ -394,7 +397,7 @@
           XAuth.expire({key:this._getKey()});
           this.authorizationState[this._getKey()]=null;
           //logout from meli
-          this._iframe('http://www.mercadolibre.com.ar/jm/logout', "logoutFrame");
+          this._iframe(this._logoutURL(), "logoutFrame");
           this._triggerSessionChange();
         },
 
@@ -414,7 +417,7 @@
                 }
                 if (key == "no-cache" && params[key])
                   params[key] = Math.random()*Math.random();
-                urlParams += key + "=" + params[key];
+            //    urlParams += key + "=" + params[key];
               }
             }
 
@@ -507,6 +510,9 @@
               }));
               //p.MercadoLibre._loginComplete();
               p.postMessage(JSON.stringify({cmd:"meli::authComplete"}), "*");
+            } else if (this.hash.action == "logout") {
+              var p = window.opener || window.parent;
+              p.postMessage(JSON.stringify({cmd:"meli::logout"}), "*");
             }
             else  if (window === window.top) XAuth.init();
         },
@@ -532,6 +538,9 @@
            });
            this._synchronizeAuthorizationState(false);
           
+        },
+        _logoutComplete : function () {
+          $('#logoutFrame').remove();
         },
         _authComplete : function() {
            //update our authorization credentials
@@ -578,6 +587,10 @@
             var xd_url = "http://" + this.options.xauth_domain + this.options.xd_url;
 
             return this.authorizationURL + "?redirect_uri=" + encodeURIComponent(xd_url) + "&response_type=token" + "&client_id=" + this.options.client_id + "&state=iframe" + "&display=popup" + "&interactive=" + (interactive ? 1 : 0);
+        },
+        _logoutURL: function() {
+            var xd_url = "http://" + this.options.xauth_domain + this.options.xd_url;
+            return "http://www.mercadolibre.com.ar/jm/logout?urlTo=" + encodeURIComponent(xd_url+"#action=logout");
         }
     };
 
