@@ -2,7 +2,7 @@ var XAuth = (function () {
     var j = window;
     var q = !(j.postMessage && j.localStorage && j.JSON);
     var data = {
-      n: "static.mercadolibre.com.ar",
+      n: "static.mlstatic.com",
       xdp: "/xd.html",
       port: ""
     }
@@ -50,6 +50,8 @@ var XAuth = (function () {
         } else if (t.cmd == "meli::authComplete") {
           MercadoLibre._authComplete();
           return;
+        } else if (t.cmd == "meli::logout") {
+          MercadoLibre._logoutComplete();
         }
         var r = p[t.id];
         if (r) {
