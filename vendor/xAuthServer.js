@@ -99,7 +99,15 @@
                 cmd: k.cmd,
                 id: k.id
             }
+        },
+        "meli::logout": function (j, k) {
+            d.removeItem(j);
+            return {
+                cmd: k.cmd,
+                id: k.id
+            }
         }
+        
     };
 
     function i(l, k, j) {
