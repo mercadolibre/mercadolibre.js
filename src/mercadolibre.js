@@ -55,7 +55,8 @@
         authorizationStateAvailableCallbacks : [],
         authorizationStateCallbackInProgress : false,
         synchronizationInProgress : false,
- 
+
+        //initialization: set base domains an url. Initialize XAuth on base window
         init : function(options) {
             this.options = options;
 
@@ -72,15 +73,12 @@
             XAuth.data.p = this.options.xd_url;
             if (window === window.top)
               XAuth.init();
-            //No credentials needed on initialization. Just on-demand retrieval
         },
+ 
+        //Is the authState still valid?
         _isExpired: function(authState) {
           //credentials are expired if not present or expired
-          //for Meli there is a special case when credentials are only-identification. In that case are always expired
           if (authState == null) {
-            return true;
-          }
-          if (authState.authorization_info.onlyID)  {
             return true;
           }
           var expirationTime = authState.authorization_info.expires_in;
@@ -93,131 +91,59 @@
           }
           return false;
         },
-        _synchronizeAuthorizationState:function(tryRemote){
-          //Synchronizes with iFrame in static.mlstatic.com domain.
 
-          var key = this.options.client_id + this.AUTHORIZATION_STATE;
+        //Synchronizes auth state with localStorage in iFrame or auth FE
+        _synchronizeAuthorizationState:function(tryRemote){
+          var key = this._getKey();
           var obj = this;
 
           //retrieves data from remote localStorage
-          obj._retrieveFromXStore( obj.options.client_id + obj.AUTHORIZATION_STATE, function(value) {
-            var key = obj.options.client_id + obj.AUTHORIZATION_STATE;
-            if (tryRemote && (value.tokens[key] == null || obj._isExpired(value.tokens[key].data)) ) {
-              //no data from iFrame - call login_status api
-              obj._getRemoteAuthorizationState();
-            } else {
-              //save authState in local variable
-              var authState = value.tokens[key].data;
-              authState.expiration = value.tokens[key].expire;
-              obj.authorizationState[key] = authState;
-              obj._onAuthorizationStateAvailable(authState);
-            }
+          XAuth.retrieve({
+            retrieve: [ key ],
+            callback: function(value) {
+                        if (tryRemote && (value.tokens[key] == null || obj._isExpired(value.tokens[key].data)) ) {
+                          //no data from iFrame - call login_status api
+                          obj._getRemoteAuthorizationState();
+                        } else {
+                          //save authState in local variable
+                          var authState = value.tokens[key].data;
+                          authState.expiration = value.tokens[key].expire;
+                          obj.authorizationState[key] = authState;
+                          obj._onAuthorizationStateAvailable(authState);
+                        }
+                      }
           });
         },
 
-        _retrieveFromXStore : function(key, retrieveCallback) {
-            XAuth.retrieve({
-                retrieve : [ key ],
-                callback : retrieveCallback
-            });
-        },
-
+        /**
+         * gets authorization state from auth FE
+         */
         _getRemoteAuthorizationState : function() {
-          //gets authorization state from api (https)
           //if already in progress dismiss call and wait
           if (!this.authorizationStateCallbackInProgress) {
             this.authorizationStateCallbackInProgress = true;
             if (this.appInfo == null) {
-                this._getApplicationInfo(); //this will call _internalGetRemoteAuthorizationState TODO: Should make it more error-safe
+                this._getApplicationInfo(this._authorize);
             } else {
-                this._internalGetRemoteAuthorizationState();
+                this._authorize();
             }
           }
         },
 
-        _getApplicationInfo : function() {
+        _getApplicationInfo : function(callback) {
             var self = this;
-            //TODO: beware 304 status response
-            this.get("/applications/" + this.options.client_id, {"no-cache":true},
+            this.get("/applications/" + this.options.client_id, {},
               function(response) {
                 self.appInfo = response[2];
-                self._internalGetRemoteAuthorizationState();
+                if (callback) callback();
             });
-        },
-
-        _isMELI: function () {
-          //are we inside MELI?
-          return (document.domain.match(/(.*\.)?((mercadolibre\.com(\.(ar|ve|uy|ec|pe|co|pa|do|cr))?)|(mercadolibre\.cl)|(mercadolivre\.com\.br)|(mercadolivre\.pt))/) || document.domain.match(/.*localhost.*/));
-        },
-
-        _internalGetRemoteAuthorizationState : function() {
-          //gets authorization state with client id loaded
-          var self = this;
-            //TODO: change when api is ready. Uses cookies instead of real api call
-            //TODO: what happens ig no orgapi present????
-          if (this._isMELI() && cookie('orgapi') != null) {
-            self._onAuthorizationStateLoaded(
-              {
-                state: 'AUTHORIZED',
-                authorization_info: {
-                  access_token: cookie('orgapi'),
-                  expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
-                  user_id: cookie("orguserid")
-                }
-              });
-          } else {
-
-          /*  self._onAuthorizationStateLoaded(
-              {
-                state: 'UNKNOWN',
-                authorization_info: {
-                  access_token: null,
-                  expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
-                  user_id: null
-                }
-              });*/
-
-
-            
-            this._authorize()
-              
-/*              Sroc.get('https://www.mercadolibre.com/jms/' + this.appInfo.site_id.toLowerCase() + '/auth/authorization_state',
-                {'client_id' : this.options.client_id}, function(){
-                    var authorizationState = response[2];
-                    self._onAuthorizationStateLoaded(authorizationState);
-                });*/
-          }
-        },
-
-        _onAuthorizationStateLoaded : function(authorizationState) {
-        //TODO: This code should be moved to xd.htm
-          //save new auth state in iFrame
-          XAuth.extend({
-            key : this.options.client_id + this.AUTHORIZATION_STATE,
-            data : JSON.stringify(authorizationState),
-            expire : new Date().getTime() + 10800 * 1000 /* expira en 3 hs */,
-            extend : [ "*" ]
-          });
-          this.authorizationState[this.options.client_id + this.AUTHORIZATION_STATE]= authorizationState;
-          this.isAuthorizationStateAvaible = false;
-          this._onAuthorizationStateAvailable(authorizationState);
-        },
-
-        _getIdState: function() {
-           return ({
-             state: 'AUTHORIZED',
-             authorization_info: {
-               access_token: cookie('orgid'),
-               expires_in: 0,
-               onlyID: true
-             }
-           });
         },
 
         _onAuthorizationStateAvailable : function(authorizationState) {
           //all callbacks waiting for authorizationState
           this.authorizationStateCallbackInProgress = false;
           this.isAuthorizationStateAvaible = true;
+          //there is a new auth state, session changed
           this._triggerSessionChange();
           while (this.authorizationStateAvailableCallbacks.length > 0){
             var callback = this.authorizationStateAvailableCallbacks.shift();
@@ -225,28 +151,31 @@
           }
         },
 
-        _getAuthorizationState : function(callback, onlyID) {
-          // credentials valid or MELI + orgid
-          if (this.isAuthorizationStateAvaible || (this._isMELI() && onlyID && cookie("orgid"))) {
-              var key = this.options.client_id + this.AUTHORIZATION_STATE;
-              //TODO: Check expiration
-              if (this.authorizationState[key] != null && !this._isExpired(this.authorizationState[key])) {
-                  callback(this.authorizationState[key]);
-              } else if (this._isMELI() && onlyID && cookie("orgid")) {
-                this.authorizationState[key] = this._getIdState();
-                callback( this._getIdState());
-              } else {
-                //expired credentials, resynchronuze pushing this action
+        getLoginStatus : function(callback) {
+          if (this.isAuthorizationStateAvaible)
+          {
+              var key = this._getKey();
+              if (this.authorizationState[key] != null && !this._isExpired(this.authorizationState[key]))
+              {
+                  callback(this.authorizationState[key])
+              }
+              else
+              {
+                //expired credentials, resynchronyze pushing this action
                 this.isAuthorizationStateAvaible = false;
                 this.authorizationStateAvailableCallbacks.push(callback);
                 this._synchronizeAuthorizationState(true);
               }
-          }else{
+          }
+          else
+          {
               this.authorizationStateAvailableCallbacks.push(callback);
               this._synchronizeAuthorizationState(true);
           }
+
         },
 
+        //partial application of a function
         _partial: function (func /* , 0..n args */ ) {
           var args = Array.prototype.slice.call(arguments, 1);
           return function () {
@@ -255,8 +184,9 @@
           };
         },
 
-        _wrap: function (callback, url, retry, method, params, next) {
-          var key = this.options.client_id + this.AUTHORIZATION_STATE;
+		//wraps a request to intercept the response
+        _wrap: function (url, method, params, options, callback) {
+          var key = this._getKey();
           var self=this;
           var wrapper = function(response) {
             //check if token is invalid
@@ -264,7 +194,7 @@
             var success = function() {
               //se pudo loguear, vuelvo a llamar al get
               if (method == "get")
-                Sroc.get( self._url(url, params), params, self._wrap( callback,url, false, method));
+                Sroc.get( self._url(url), params, self._wrap( url, method, params, {}, callback));
               else if (method == "post") {}
             };
             var failure = function () {
@@ -280,7 +210,7 @@
                 XAuth.expire({key:key});
               }
               //get authentication state and then resend get call
-              if (retry)
+              if (options.retry)
                 self.withLogin(success, failure, true, false);
               else
                 failure();
@@ -290,18 +220,19 @@
           };
           return wrapper;
         },
+ 
         get : function(url, params, callback, next) {
           //no cache params
           if (!next)
-            next = this._wrap(callback, url, true, "get", params, next);
+            next = this._wrap(url,"get", params, {retry:true}, callback);
 
-          Sroc.get(this._url(url, params), params, next);
+          Sroc.get(this._url(url), params, next);
         },
 
         post : function(url, params, callback) {
           var self=this;
           var call = function() {
-            Sroc.post(self._url(url), params, self._wrap(callback, self._url(url), false, "post", params));
+            Sroc.post(self._url(url), params, self._wrap(url, "post", params, {}, callback));
           }
           this.withLogin(call, callback, true, false);
         },
@@ -310,36 +241,30 @@
           if (!params) {
             params = {};
           }
-          params._method = "DELETE";
-          Sroc.get(this._url(url, params), params, this._wrap(callback));
+          Sroc.remove(this._url(url), params, this._wrap(url, "delete", params, {}, callback));
         },
 
         getToken : function() {
-	  var key = this.options.client_id + this.AUTHORIZATION_STATE;
-	  var authorizationState = this.authorizationState[key];
-	  if (authorizationState != null) {
-	    var token = authorizationState.authorization_info.access_token;
-	    var expirationTime = authorizationState.authorization_info.expires_in;
-	    if (token && expirationTime) {
-		var dateToExpire = new Date(parseInt(expirationTime));
-		var now = new Date();
-		if (dateToExpire <= now) {
-		    token = null;
-		}
-	    }
-	    return (token && token.length > 0) ? token : null;
-	  } else {
+          var key = this._getKey();
+          var authorizationState = this.authorizationState[key];
+          if (authorizationState != null) {
+            var token = authorizationState.authorization_info.access_token;
+            var expirationTime = authorizationState.authorization_info.expires_in;
+            if (token && expirationTime) {
+                var dateToExpire = new Date(parseInt(expirationTime));
+                var now = new Date();
+                if (dateToExpire <= now) {
+                    token = null;
+                }
+            }
+            return (token && token.length > 0) ? token : null;
+          } else {
             return null;
           }
         },
-        getLoginStatus : function (callback, onlyID) {
-            this._getAuthorizationState(function(authorizationState){
-              callback(authorizationState);
-            }, onlyID);
-        },
-        withLogin : function(successCallback, failureCallback, forceLogin, onlyID) {
+        withLogin : function(successCallback, failureCallback, forceLogin) {
             var self = this;
-            this._getAuthorizationState(function(authorizationState){
+            this.getLoginStatus(function(authorizationState){
                 if(authorizationState.state == 'AUTHORIZED'){
                     successCallback();
                 }else if(forceLogin){
@@ -350,7 +275,7 @@
                       failureCallback();
                     }
                 }
-            }, onlyID);
+            });
         },
 
         login : function() {
@@ -407,19 +332,9 @@
         getSession: function() {
           return this.authorizationState[this._getKey()];
         },
-        _url : function(url, params) {
+        _url : function(url) {
             url = this.baseURL + url;
             var urlParams = "";
-            if (params) {
-              for(var key in params){
-                if (urlParams.length > 0) {
-                  urlParams += "&";
-                }
-                if (key == "no-cache" && params[key])
-                  params[key] = Math.random()*Math.random();
-            //    urlParams += key + "=" + params[key];
-              }
-            }
 
             var token = this.getToken();
 
@@ -463,13 +378,14 @@
         // Check if we're returning from a redirect
         // after authentication inside an iframe.
         _checkPostAuthorization : function() {
+			var p = window.opener || window.parent;
             if (this.hash.state && this.hash.state == "iframe") {
-              var p = window.opener || window.parent;
-              if (!this.hash.error) {
+			  //from auth
+              if (!this.hash.error) {	
                 this.options = {client_id:
                   RegExp("(APP_USR\\-)(\\d+)(\\-)").exec(this.hash.access_token)[2]
                 }
-                var key = this.options.client_id + this.AUTHORIZATION_STATE;
+                var key = this._getKey();
                 //save in local storage the hash data
                 var authorizationState =  {
                     state: 'AUTHORIZED',
@@ -489,9 +405,9 @@
               }
               p.postMessage(JSON.stringify({cmd:"meli::loginComplete"}), "*");
             } else if (this.hash.state) {
-              var p = window.opener || window.parent;
+			  //from state
               authorizationState = this.hash;
-              var key = this.hash.client_id + this.AUTHORIZATION_STATE;
+              var key = this._getKey();
               if (!this.hash.authorization_info && this.hash.state == "UNKNOWN") {
                 this.hash.authorization_info =  {
                   access_token: null,
@@ -505,16 +421,14 @@
               this.store.set(key, JSON.stringify({
                 key : key,
                 data : authorizationState,
-                expire : expiration /* expira en 3 hs */,
+                expire : expiration ,
                 extend : [ "*" ]
               }));
-              //p.MercadoLibre._loginComplete();
               p.postMessage(JSON.stringify({cmd:"meli::authComplete"}), "*");
             } else if (this.hash.action == "logout") {
-              var p = window.opener || window.parent;
               p.postMessage(JSON.stringify({cmd:"meli::logout"}), "*");
             }
-            else  if (window === window.top) XAuth.init();
+            //else  if (window === window.top) XAuth.init();
         },
 
         _loginComplete : function() {
@@ -526,8 +440,6 @@
                 else
                         this._popupWindow.close();
             }
-            //retrieve auth data
-            
            //update our authorization credentials
            var self = this;
            this.authorizationStateAvailableCallbacks.push(function(authState) {
@@ -565,8 +477,6 @@
             } else {
               if (this._popupWindow.focus)
                 this._popupWindow.focus();
-/*              else
-                this._popupWindow.show();*/
             }
         },
         _getKey: function() {
@@ -580,18 +490,18 @@
           
         },
         _authorizationStateURL: function() {
-          var xd_url = "http://" + this.options.xauth_domain + this.options.xd_url;
-          return this.authorizationStateURL.replace("SITE", this.appInfo.site_id.toLowerCase()) + "?client_id=" + this.options.client_id + "&redirect_uri=" + encodeURIComponent(xd_url) + "&response_type=token";
+          return this.authorizationStateURL.replace("SITE", this.appInfo.site_id.toLowerCase()) + "?client_id=" + this.options.client_id + "&redirect_uri=" + encodeURIComponent(this._xd_url()) + "&response_type=token";
         },
         _authorizationURL : function(interactive) {
-            var xd_url = "http://" + this.options.xauth_domain + this.options.xd_url;
-
-            return this.authorizationURL + "?redirect_uri=" + encodeURIComponent(xd_url) + "&response_type=token" + "&client_id=" + this.options.client_id + "&state=iframe" + "&display=popup" + "&interactive=" + (interactive ? 1 : 0);
+            return this.authorizationURL + "?redirect_uri=" + encodeURIComponent(this._xd_url()) + "&response_type=token" + "&client_id=" + this.options.client_id + "&state=iframe" + "&display=popup" + "&interactive=" + (interactive ? 1 : 0);
         },
         _logoutURL: function() {
-            var xd_url = "http://" + this.options.xauth_domain + this.options.xd_url;
-            return "http://www.mercadolibre.com.ar/jm/logout?urlTo=" + encodeURIComponent(xd_url+"#action=logout");
-        }
+            return "http://www.mercadolibre.com.ar/jm/logout?urlTo=" + encodeURIComponent(this._xd_url()+"#action=logout");
+        },
+        _xd_url: function() {
+			return "http://" + this.options.xauth_domain + this.options.xd_url;
+		}
+        
     };
 
     MercadoLibre._parseHash();
