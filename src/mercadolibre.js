@@ -81,6 +81,9 @@
           if (authState == null) {
             return true;
           }
+          if (typeof(authState.authorization_info) == "undefined")
+			return true;
+			
           var expirationTime = authState.authorization_info.expires_in;
           if (expirationTime) {
             var dateToExpire = new Date(parseInt(expirationTime));
@@ -106,9 +109,12 @@
                           obj._getRemoteAuthorizationState();
                         } else {
                           //save authState in local variable
-                          var authState = value.tokens[key].data;
-                          authState.expiration = value.tokens[key].expire;
-                          obj.authorizationState[key] = authState;
+                          var authState = null
+                          if (typeof(value.tokens[key]) != "undefined") {
+							var authState = value.tokens[key].data;
+							authState.expiration = value.tokens[key].expire;
+						  }
+						  obj.authorizationState[key] = authState;
                           obj._onAuthorizationStateAvailable(authState);
                         }
                       }
@@ -298,7 +304,7 @@
           
         },
         _authorize: function () {
-          this._iframe(this._authorizationStateURL());
+          MercadoLibre._iframe(MercadoLibre._authorizationStateURL());
         },
         bind : function(event, callback) {
             if (typeof (this.callbacks[event]) == "undefined")
@@ -332,6 +338,7 @@
         getSession: function() {
           return this.authorizationState[this._getKey()];
         },
+        
         _url : function(url) {
             url = this.baseURL + url;
             var urlParams = "";
@@ -374,15 +381,30 @@
               }
             }
         },
-
+		_notifyParent: function(message) {
+			var p = window.opener || window.parent;
+			if (typeof(p) == "undefined") return;
+			if (typeof(postMessage) == "undefined") {
+				
+				if (message == "meli::loginComplete") 
+					p._loginComplete();
+				else if (message == "meli::authComplete") 
+					p._authComplete();
+				else if (message == "meli::logout") 
+					p._logoutComplete();
+				
+			} else p.postMessage(JSON.stringify({cmd:message}), "*");
+		},
         // Check if we're returning from a redirect
         // after authentication inside an iframe.
         _checkPostAuthorization : function() {
 			var p = window.opener || window.parent;
+			
             if (this.hash.state && this.hash.state == "iframe") {
-			  //from auth
+			  //returning from authorization (login)
               if (!this.hash.error) {	
-                this.options = {client_id:
+				//TODO: Should remove this parsing
+				this.options = {client_id:
                   RegExp("(APP_USR\\-)(\\d+)(\\-)").exec(this.hash.access_token)[2]
                 }
                 var key = this._getKey();
@@ -398,23 +420,23 @@
                 this.store.set(key, JSON.stringify({
                   key : key,
                   data : authorizationState,
-                  expire : new Date().getTime() + 10800 * 1000 /* expira en 3 hs */,
+                  expire : authorizationState.authorization_info.expires_in,
                   extend : [ "*" ]
                 }));
 
               }
-              p.postMessage(JSON.stringify({cmd:"meli::loginComplete"}), "*");
+              this._notifyParent("meli::loginComplete");
             } else if (this.hash.state) {
-			  //from state
+			  //from Authorization State
               authorizationState = this.hash;
-              var key = this._getKey();
-              if (!this.hash.authorization_info && this.hash.state == "UNKNOWN") {
+              var key = this.hash.client_id + this.AUTHORIZATION_STATE;
+              if (!this.hash.authorization_info && (this.hash.state == "UNKNOWN" || this.hash.state=="NOT_AUTHORIZED")) {
                 this.hash.authorization_info =  {
                   access_token: null,
                   expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
                   user_id: null
                 }
-              } else {
+              } else if (this.hash.autorization_info) {
                 var expiration = new Date().getTime() + (this.hash.authorization_info ? this.hash.authorization_info.expires_in* 1000 : 0);
                 this.hash.authorization_info.expires_in = expiration;
               }
@@ -424,9 +446,11 @@
                 expire : expiration ,
                 extend : [ "*" ]
               }));
-              p.postMessage(JSON.stringify({cmd:"meli::authComplete"}), "*");
+              this._notifyParent("meli::authComplete");
+
             } else if (this.hash.action == "logout") {
-              p.postMessage(JSON.stringify({cmd:"meli::logout"}), "*");
+              this._notifyParent("meli::logout");
+              
             }
             //else  if (window === window.top) XAuth.init();
         },

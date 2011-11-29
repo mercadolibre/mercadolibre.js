@@ -133,17 +133,32 @@ var cookie = function(name, value, options) {
           MercadoLibre.logout();
           callback(null);
           return;
+        } else if (cookie("orgapi") != null) {
+          //just leave it
         } else if (cookie("orgid") != null) {
           //identified user
           status.state = "IDENTIFIED";
           status.authorization_info.access_token = cookie("orgid");
           MercadoLibre.authorizationState[MercadoLibre._getKey()];
         }
-      } else if (status.state == "UNKNOWN") {
-        if (cookie("orgid") != null) {
+      } else if (status.state == "UNKNOWN" || status.state == "NOT_AUTHORIZED") {
+        //if orgapi then is indeed authorized
+        if (cookie("orgapi") != null) {
+          status.state = "AUTHORIZED";
+          status.authorization_info = {
+            access_token: cookie("orgapi"),
+            expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
+            user_id: null
+          }
+          MercadoLibre.authorizationState[MercadoLibre._getKey()];
+        } else if (cookie("orgid") != null) {
           //identified user
           status.state = "IDENTIFIED";
-          status.authorization_info.access_token = cookie("orgid");
+          status.authorization_info = {
+            access_token: cookie("orgid"),
+            expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
+            user_id: null
+          }
           MercadoLibre.authorizationState[MercadoLibre._getKey()];
         }
       }
