@@ -63,14 +63,21 @@
             if (this.options.sandbox) 
                 this.baseURL = this.baseURL.replace(/api\./, "sandbox.");
             
+            if (this.options.test) 
+                this.baseURL = this.baseURL.replace(/https\./, "http.");
+            
             if (!this.options.xauth_domain)
               this.options.xauth_domain = "static.mlstatic.com";
+
+            if (this.options.xauth_domain_fallback && typeof(postMessage) == "undefined") 
+              this.options.xauth_domain = this.options.xauth_domain_fallback;
               
             if (!this.options.xd_url)
               this.options.xd_url = "/xd.html";
             
             XAuth.data.n = this.options.xauth_domain;
             XAuth.data.p = this.options.xd_url;
+            XAuth.data.port = this.options.xauth_port;
             if (window === window.top)
               XAuth.init();
         },
@@ -104,20 +111,20 @@
           XAuth.retrieve({
             retrieve: [ key ],
             callback: function(value) {
-                        if (tryRemote && (value.tokens[key] == null || obj._isExpired(value.tokens[key].data)) ) {
-                          //no data from iFrame - call login_status api
-                          obj._getRemoteAuthorizationState();
-                        } else {
-                          //save authState in local variable
-                          var authState = null
-                          if (typeof(value.tokens[key]) != "undefined") {
-							var authState = value.tokens[key].data;
-							authState.expiration = value.tokens[key].expire;
-						  }
-						  obj.authorizationState[key] = authState;
-                          obj._onAuthorizationStateAvailable(authState);
-                        }
-                      }
+				if (tryRemote && (value.tokens[key] == null || obj._isExpired(value.tokens[key].data)) ) {
+				  //no data from iFrame - call login_status api
+				  obj._getRemoteAuthorizationState();
+				} else {
+				  //save authState in local variable
+				  var authState = null
+				  if (typeof(value.tokens[key]) != "undefined") {
+					var authState = value.tokens[key].data;
+					authState.expiration = value.tokens[key].expire;
+				  }
+				  obj.authorizationState[key] = authState;
+				  obj._onAuthorizationStateAvailable(authState);
+				}
+			  }
           });
         },
 
@@ -523,7 +530,7 @@
             return "http://www.mercadolibre.com.ar/jm/logout?urlTo=" + encodeURIComponent(this._xd_url()+"#action=logout");
         },
         _xd_url: function() {
-			return "http://" + this.options.xauth_domain + this.options.xd_url;
+			return "http://" + this.options.xauth_domain + (this.options.xauth_port ? ":" + this.options.xauth_port : "") + this.options.xd_url;
 		}
         
     };
