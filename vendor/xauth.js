@@ -15,7 +15,7 @@ var XAuth = (function () {
     var m = [];
     var listeners = null;
     function init() {
-      if (this.data) this.data.e = "http://" + this.data.n + (data.port?":"+data.port:"") + this.data.xdp;
+      if (data) data.e = "http://" + data.n + (data.port?":"+data.port:"") + data.xdp;
       if (listeners) return;
       else {
         if (j.addEventListener) {
@@ -32,7 +32,7 @@ var XAuth = (function () {
       //as xauth is not always initialized try/catch this
       try {
         var u = s.origin.split("://")[1].split(":")[0];
-        var n = this.data ? this.data.n : data.n;
+        var n = data.n;
         if (u != n) {
             return
         }
@@ -52,6 +52,8 @@ var XAuth = (function () {
           return;
         } else if (t.cmd == "meli::logout") {
           MercadoLibre._logoutComplete();
+        } else if (t.cmd == "meli::close") {
+          close();
         }
         var r = p[t.id];
         if (r) {
@@ -65,7 +67,7 @@ var XAuth = (function () {
     }
     function i() {
         if (g || a) {
-            g.src = this.data?this.data.e:data.e;
+            g.src = data.e;
             return
         }
         var s = j.document;
@@ -76,7 +78,7 @@ var XAuth = (function () {
         r.left = r.top = "-999px";
         s.body.appendChild(g);
         init();
-        g.src = this.data?this.data.e:data.e
+        g.src = data.e;
     }
     function f() {
         for (var r = 0; r < m.length; r++) {
@@ -88,6 +90,7 @@ var XAuth = (function () {
     }
     function h(r) {
         if (q) {
+          //postMessage not supported
             return
         }
         r.id = d;
