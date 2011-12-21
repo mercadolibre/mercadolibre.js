@@ -1,4 +1,6 @@
 ;
+
+
 (function(cookie, XAuth) {
 
     var Store = function() {
@@ -55,10 +57,23 @@
         authorizationStateAvailableCallbacks : [],
         authorizationStateCallbackInProgress : false,
         synchronizationInProgress : false,
-
+        showLogin: true,
+        messages: (window.postMessage && window.localStorage && window.JSON),
+        initialized: false,
+        initCallbacks: [],
+        _partial: function (func /* , 0..n args */ ) {
+          var args = Array.prototype.slice.call(arguments, 1);
+          var self = this;
+          return function () {
+            var allArguments = args.concat(Array.prototype.slice.call(arguments));
+            return func.apply(self, allArguments);
+          };
+        },
         //initialization: set base domains an url. Initialize XAuth on base window
         init : function(options) {
             this.options = options;
+
+            this.messages = (window.postMessage && window.localStorage && window.JSON);
 
             if (this.options.sandbox) 
                 this.baseURL = this.baseURL.replace(/api\./, "sandbox.");
@@ -69,19 +84,34 @@
             if (!this.options.xauth_domain)
               this.options.xauth_domain = "static.mlstatic.com";
 
-            if (this.options.xauth_domain_fallback && typeof(postMessage) == "undefined") 
+            if (this.options.xauth_domain_fallback && !this.messages) 
               this.options.xauth_domain = this.options.xauth_domain_fallback;
               
             if (!this.options.xd_url)
               this.options.xd_url = "/xd.html";
+            if (typeof(this.options.show_login) != "undefined")
+              this.showLogin = this.options.show_login;
             
             XAuth.data.n = this.options.xauth_domain;
-            XAuth.data.p = this.options.xd_url;
+            XAuth.data.xdp = this.options.xd_url;
             XAuth.data.port = this.options.xauth_port;
-            if (window === window.top)
+            if (window.self == window.top)
               XAuth.init();
+            this.initialized =true;
+            while (this.initCallbacks.length > 0) {
+              var callback = this.initCallbacks.shift();
+              try {
+                callback();
+              } catch(e){};
+            }
         },
- 
+        
+        waitForInit: function(callback) {
+          if (this.initialized)
+            callback();
+          else
+            this.initCallbacks.push(callback);
+        },
         //Is the authState still valid?
         _isExpired: function(authState) {
           //credentials are expired if not present or expired
@@ -104,34 +134,48 @@
 
         //Synchronizes auth state with localStorage in iFrame or auth FE
         _synchronizeAuthorizationState:function(tryRemote){
+          if (!this.initialized){ 
+            this.initCallbacks.push(this._partial(this._synchronizeAuthorizationState, tryRemote));
+            return;
+          }
+            
           var key = this._getKey();
           var obj = this;
-
-          //retrieves data from remote localStorage
-          XAuth.retrieve({
-            retrieve: [ key ],
-            callback: function(value) {
-				if (tryRemote && (value.tokens[key] == null || obj._isExpired(value.tokens[key].data)) ) {
-				  //no data from iFrame - call login_status api
-				  obj._getRemoteAuthorizationState();
-				} else {
-				  //save authState in local variable
-				  var authState = null
-				  if (typeof(value.tokens[key]) != "undefined") {
-					var authState = value.tokens[key].data;
-					authState.expiration = value.tokens[key].expire;
+		  if (this.messages) {	
+			  //retrieves data from remote localStorage
+			  XAuth.retrieve({
+				retrieve: [ key ],
+				callback: function(value) {
+					if (tryRemote && (value.tokens[key] == null || obj._isExpired(value.tokens[key].data)) ) {
+					  //no data from iFrame - call login_status api
+					  obj._getRemoteAuthorizationState();
+					} else {
+					  //save authState in local variable
+					  var authState = null
+					  if (typeof(value.tokens[key]) != "undefined") {
+						var authState = value.tokens[key].data;
+						authState.expiration = value.tokens[key].expire;
+					  }
+					  obj.authorizationState[key] = authState;
+					  obj._onAuthorizationStateAvailable(authState);
+					}
 				  }
-				  obj.authorizationState[key] = authState;
-				  obj._onAuthorizationStateAvailable(authState);
-				}
-			  }
-          });
+			  });
+			} else {
+				//open xd iframe
+				obj._getRemoteAuthorizationState();
+			}
         },
 
         /**
          * gets authorization state from auth FE
          */
         _getRemoteAuthorizationState : function() {
+          if (!this.initialized){ 
+            this.initCallbacks.push(this._getRemoteAutorizationState);
+            return;
+          }
+
           //if already in progress dismiss call and wait
           if (!this.authorizationStateCallbackInProgress) {
             this.authorizationStateCallbackInProgress = true;
@@ -144,6 +188,11 @@
         },
 
         _getApplicationInfo : function(callback) {
+          if (!this.initialized){ 
+            this.initCallbacks.push(this._partial(this._getApplicationInfo, callback));
+            return;
+          }
+
             var self = this;
             this.get("/applications/" + this.options.client_id, {},
               function(response) {
@@ -165,6 +214,11 @@
         },
 
         getLoginStatus : function(callback) {
+          if (!this.initialized){ 
+            this.initCallbacks.push(this._partial(this.getLoginStatus, callback));
+            return;
+          }
+
           if (this.isAuthorizationStateAvaible)
           {
               var key = this._getKey();
@@ -188,15 +242,22 @@
 
         },
 
-        //partial application of a function
-        _partial: function (func /* , 0..n args */ ) {
-          var args = Array.prototype.slice.call(arguments, 1);
-          return function () {
-            var allArguments = args.concat(Array.prototype.slice.call(arguments));
-            return func.apply(this, allArguments);
-          };
-        },
+        _expireToken: function(key) {
+          if (!this.initialized){ 
+            this.initCallbacks.push(this._partial(this._expireToken, key));
+            return;
+          }
 
+          XAuth.expire({key:key});
+          MercadoLibre.authorizationState[key] = null;
+        },
+        tokenIssue: function(response) {
+          return response[0] != 200 && (
+              (response[2].error != null && (
+                (Object.prototype.toString.call( response[2].error ) === '[object Array]' && response[2].error[0].match(/.*(token|OAuth).*/)) ||
+                (typeof( response[2].error ) === 'string'&& response[2].error.match(/.*(token|OAuth).*/)))) ||
+              (response[2].message != null && response[2].message.match(/.*(token|OAuth).*/)) || response[0] == 403)
+        },
 		//wraps a request to intercept the response
         _wrap: function (url, method, params, options, callback) {
           var key = this._getKey();
@@ -214,17 +275,15 @@
               properCallback();
             };
             //invalid token error
-            if (response[0] != 200 && ((response[2].error != null && response[2].error.match(/.*(token|OAuth).*/)) ||
-                                       (response[2].message != null && response[2].message.match(/.*(token|OAuth).*/)) || response[0] == 403)
-            ) {
+            if (self.tokenIssue(response)) {
               if (!self.authorizationStateCallbackInProgress && self.isAuthorizationStateAvaible) {
                 self.isAuthorizationStateAvaible = false;
                 //delete token
-                XAuth.expire({key:key});
+                self._expireToken(key);
               }
               //get authentication state and then resend get call
               if (options.retry)
-                self.withLogin(success, failure, true, false);
+                self.withLogin(success, failure, self.showLogin);
               else
                 failure();
             } else {
@@ -235,6 +294,11 @@
         },
  
         get : function(url, params, callback, next) {
+          if (!this.initialized){ 
+            this.initCallbacks.push(this._partial(this.get, url, params, callback, next));
+            return;
+          }
+
           //no cache params
           if (!next)
             next = this._wrap(url,"get", params, {retry:true}, callback);
@@ -243,14 +307,24 @@
         },
 
         post : function(url, params, callback) {
+          if (!this.initialized){ 
+            this.initCallbacks.push(this._partial(this.post, url, params, callback));
+            return;
+          }
+
           var self=this;
           var call = function() {
             Sroc.post(self._url(url), params, self._wrap(url, "post", params, {}, callback));
           }
-          this.withLogin(call, callback, true, false);
+          this.withLogin(call, callback, self.showLogin);
         },
 
         remove : function(url, params, callback) {
+          if (!this.initialized){ 
+            this.initCallbacks.push(this._partial(this.remove, url, params, callback));
+            return;
+          }
+
           if (!params) {
             params = {};
           }
@@ -276,6 +350,11 @@
           }
         },
         withLogin : function(successCallback, failureCallback, forceLogin) {
+          if (!this.initialized){ 
+            this.initCallbacks.push(this._partial(this.withLogin, successCallback, failureCallback, forceLogin));
+            return;
+          }
+
             var self = this;
             this.getLoginStatus(function(authorizationState){
                 if(authorizationState.state == 'AUTHORIZED'){
@@ -292,6 +371,11 @@
         },
 
         login : function() {
+          if (!this.initialized){ 
+            this.initCallbacks.push(this.login);
+            return;
+          }
+
             this._popup(this._authorizationURL(true));
         },
         _iframe: function(url, id) {
@@ -366,18 +450,22 @@
         },
 
         _parseHash : function() {
-            var hash = window.location.hash.substr(1);
+            var localHash = window.location.hash;
 
-            if (hash.length == 0) {
+            if (localHash.length == 0) {
+                return;
+            }
+            localHash = localHash.substr(1);
+            if (localHash.length == 0) {
                 return;
             }
             var self = this;
 
 
-            if (hash[0] == '%')
-              self.hash=JSON.parse(unescape(hash));
+            if (localHash[0] == '%' || localHash[0] == '{')
+              self.hash=JSON.parse(unescape(localHash));
             else {
-              var pairs = hash.split("&");
+              var pairs = localHash.split("&");
 
               for ( var i = 0; i < pairs.length; i++) {
                   var pair = null;
@@ -391,13 +479,15 @@
 		_notifyParent: function(message) {
 			var p = window.opener || window.parent;
 			if (typeof(p) == "undefined") return;
-			if (typeof(postMessage) == "undefined") {
+			if (!this.messages) {
 				
 				if (message == "meli::loginComplete") 
 					p._loginComplete();
 				else if (message == "meli::authComplete") 
 					p._authComplete();
 				else if (message == "meli::logout") 
+					p._logoutComplete();
+				else if (message == "meli::close") 
 					p._logoutComplete();
 				
 			} else p.postMessage(JSON.stringify({cmd:message}), "*");
@@ -443,7 +533,7 @@
                   expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
                   user_id: null
                 }
-              } else if (this.hash.autorization_info) {
+              } else if (this.hash.authorization_info) {
                 var expiration = new Date().getTime() + (this.hash.authorization_info ? this.hash.authorization_info.expires_in* 1000 : 0);
                 this.hash.authorization_info.expires_in = expiration;
               }
@@ -459,17 +549,21 @@
               this._notifyParent("meli::logout");
               
             }
-            //else  if (window === window.top) XAuth.init();
+            
         },
 
         _loginComplete : function() {
             if (this._popupWindow) {
-                if (this._popupWindow.type && this._popupWindow.type == "modal") {
+              var isModal = false;
+              try {
+                isModal = this._popupWindow.type && this._popupWindow.type == "modal";
+              }catch (e) {}
+                if (isModal) {
                         this._popupWindow.hide();
                         this._popupWindow = null;
                 }
-                else
-                        this._popupWindow.close();
+                else 
+                        this._popupWindow.postMessage(JSON.stringify({cmd:"meli::close"}), "*");
             }
            //update our authorization credentials
            var self = this;
