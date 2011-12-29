@@ -125,6 +125,10 @@ var cookie = function(name, value, options) {
         var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
         cookie("orgapi", null, {domain:domain, path:"/"});
       }
+      MercadoLibre._getApplicationInfo = function(callback) {
+          MercadoLibre.appInfo = {id: MercadoLibre.options.client_id, site_id: MercadoLibre.options.site_id};
+          if (callback) callback();
+        }
     },
     _partial: function (func /* , 0..n args */ ) {
       var args = Array.prototype.slice.call(arguments, 1);
@@ -139,10 +143,15 @@ var cookie = function(name, value, options) {
         //token circuit is OK, validate cookies
         if ((cookie("orgapi")== null || cookie("orgapi") == "0")&& (cookie("orgid") == null || cookie("orgid") == "0")) {
           MercadoLibre.logout();
-          callback(null);
-          return;
+          status=null;
         } else if (cookie("orgapi") != null && cookie("orgapi") != "0") {
-          //just leave it
+          //validate user id
+          if (cookie("orguseridp") != null && cookie("orguseridp") != "0") {
+            if (cookie("orguseridp") != status.authorization_info.user_id) {
+              MercadoLibre.logout();
+              status=null;
+            }
+          }
         } else if (cookie("orgid") != null && cookie("orgid") != "0") {
           //identified user
           status.state = "IDENTIFIED";

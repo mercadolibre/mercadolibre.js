@@ -501,33 +501,33 @@ var Sroc = (function() {
 	},
 
     request: function(method, url, params, callback) {
-      var name = this._callbackName()
+      var name = this._callbackName();
 
       window[name] = function(status, headers, body) {
-        callback.call(null, status, headers, body)
+        callback.call(null, status, headers, body);
 
-        window[name] = null
+        window[name] = null;
 
         try {
-          delete window[name]
+          delete window[name];
         }
         catch (e) { }
       }
 
-      this.load(this.url(method, url, params, name))
+      this.load(this.url(method, url, params, name));
     },
 
     load: function(url) {
-      var done = false
-      var script = document.createElement("script")
+      var done = false;
+      var script = document.createElement("script");
 
       script.src = url + (url.indexOf("?") > -1 ? "&" : "?") + "_MELI_SDK_RANDOM=" + Math.random()*Math.random();
-      script.async = true
+      script.async = true;
 
       script.onload = script.onreadystatechange = function() {
         if (!done && (!this.readyState || this.readyState === "loaded" || this.readyState === "complete")) {
-          done = true
-          script.onload = script.onreadystatechange = null
+          done = true;
+          script.onload = script.onreadystatechange = null;
           if (script && script.parentNode) {
             script.parentNode.removeChild(script)
           }
@@ -538,11 +538,11 @@ var Sroc = (function() {
     },
 
     url: function(method, url, params, callbackName) {
-      var key
+      var key;
 
-      url += url.indexOf("?") > -1 ? "&" : "?"
+      url += url.indexOf("?") > -1 ? "&" : "?";
 
-      url += "callback=" + callbackName
+      url += "callback=" + callbackName;
 
       if (method == "GET") {
         for (key in params) {

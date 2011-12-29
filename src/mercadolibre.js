@@ -46,7 +46,8 @@
         //authorizationStateURL : "https://auth.mercadolibre.com.ar/authorization/index",
   
         AUTHORIZATION_STATE : "authorization_state",
-
+        
+        options: {},
         hash : {},
         callbacks : {},
         pendingCallbacks: [],
