@@ -125,6 +125,13 @@ var cookie = function(name, value, options) {
         var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
         cookie("orgapi", null, {domain:domain, path:"/"});
       }
+      MercadoLibre._storeSecret = function(secret) {
+          //skip subdomain
+          var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
+          cookie("mlsecret", JSON.stringify(secret), {domain:domain, path:"/"});
+          this.secret = secret;
+      }
+
       MercadoLibre._getApplicationInfo = function(callback) {
           MercadoLibre.appInfo = {id: MercadoLibre.options.client_id, site_id: MercadoLibre.options.site_id};
           if (callback) callback();

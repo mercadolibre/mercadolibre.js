@@ -381,33 +381,39 @@ if (!this.JSON) {
             for (var p = 0; p < l.retrieve.length; p++) {
                 var s = l.retrieve[p];
                 var n = d.getItem(s);
-                var r = n ? JSON.parse(n) : null;
-                if (r && !r.block) {
-                    var u = (t==s);
-                    if (!u) {
-                        for (var o = 0; o < r.extend.length; o++) {
-                            if (r.extend[o] == "*" || t.match(eval(r.extend[o]))) {
-                                u = true;
-                                break
-                            }
-                        }
-                    }
+                var r = null;
+                try {
+                  r = n ? JSON.parse(n) : null;
+                  if (r && !r.block) {
+                      var u = (t==s);
+                      if (!u) {
+                          for (var o = 0; o < r.extend.length; o++) {
+                              if (r.extend[o] == "*" || t.match(eval(r.extend[o]))) {
+                                  u = true;
+                                  break
+                              }
+                          }
+                      }
 
-                    if (u) {
-                        var m = new Date(r.expire);
-                        if (m < new Date()) {
-                            d.removeItem(s);
-                            continue
-                        }
-                        if (r.session && r.session != a) {
-                            d.removeItem(s);
-                            continue
-                        }
-                        q[s] = {
-                            data: r.data,
-                            expire: r.expire
-                        }
-                    }
+                      if (u) {
+                          var m = new Date(r.expire);
+                          if (m < new Date()) {
+                              d.removeItem(s);
+                              continue
+                          }
+                          if (r.session && r.session != a) {
+                              d.removeItem(s);
+                              continue
+                          }
+                          q[s] = {
+                              data: r.data,
+                              expire: r.expire
+                          }
+                      }
+                  }
+                } catch (e) {
+                  d.removeItem(s);
+                  q = [];
                 }
             }
             return {

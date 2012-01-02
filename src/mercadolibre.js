@@ -26,6 +26,65 @@
             window.localStorage.setItem(key, value);
         };
 
+        /**
+         * Crypted storage
+         * */
+         Store.prototype.getSecure = function(key, secret) {
+            var crypto = this.get(key);
+
+            if (secret && secret != "" && crypto) {
+              var value = this._decrypt(secret, crypto);
+              var length = parseInt(this.get(key + ".length"));
+
+              return value.substring(0, length);
+            }
+
+            return undefined;
+          }
+
+          Store.prototype.setSecure = function(key, value, options) {
+            options = options || {};
+
+            var domain = options.domain ? options.domain : window.location.hostname;
+
+            var secret = this._generateSecret();
+
+            var data = JSON.stringify(value.data);
+
+            var crypto = this._encrypt(secret, data);
+
+            value.data = crypto;
+            this.set(key, JSON.stringify(value));
+            
+            return {secret:secret, length:data.length};
+
+          }
+
+          Store.prototype._encrypt = function(secret, message) {
+            var crypto = DESCipher.des(secret, message, 1/*encrypt=true*/, 0/*vector ? 1 : 0*/, null/*vector*/);
+            crypto = DESExtras.stringToHex(crypto);
+            return crypto;
+          }
+
+          Store.prototype._decrypt = function(secret, crypto) {
+            var message = DESExtras.hexToString(crypto);
+            message = DESCipher.des(secret, message, 0/*encrypt=false*/, 0/*vector=false*/, null/*vector*/);
+            return message;
+          }
+
+          Store.prototype._generateSecret = function() {
+            var v = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+                 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
+                 '1','2','3','4','5','6','7','8','9','0']
+
+            for(var j, x, i = v.length; i; j = parseInt(Math.random() * i), x = v[--i], v[i] = v[j], v[j] = x);
+
+            var secret = v.slice(0,8).join("");
+
+            return secret;
+          }
+  
+
     } else {
         Store.prototype.get = function(key) {
             return this.map[key];
@@ -120,7 +179,7 @@
             return true;
           }
           if (typeof(authState.authorization_info) == "undefined")
-			return true;
+            return true;
 			
           var expirationTime = authState.authorization_info.expires_in;
           if (expirationTime) {
@@ -132,6 +191,13 @@
           }
           return false;
         },
+      _decryptAuthorizationState: function(state) {
+          var retVal = this.store._decrypt(this.secret.secret, state);
+          var length = parseInt(this.secret.length);
+          retVal = retVal.substring(0, length);
+          retVal = JSON.parse(retVal);
+          return retVal;
+        },
 
         //Synchronizes auth state with localStorage in iFrame or auth FE
         _synchronizeAuthorizationState:function(tryRemote){
@@ -142,30 +208,45 @@
             
           var key = this._getKey();
           var obj = this;
-		  if (this.messages) {	
-			  //retrieves data from remote localStorage
-			  XAuth.retrieve({
-				retrieve: [ key ],
-				callback: function(value) {
-					if (tryRemote && (value.tokens[key] == null || obj._isExpired(value.tokens[key].data)) ) {
-					  //no data from iFrame - call login_status api
-					  obj._getRemoteAuthorizationState();
-					} else {
-					  //save authState in local variable
-					  var authState = null
-					  if (typeof(value.tokens[key]) != "undefined") {
-						var authState = value.tokens[key].data;
-						authState.expiration = value.tokens[key].expire;
-					  }
-					  obj.authorizationState[key] = authState;
-					  obj._onAuthorizationStateAvailable(authState);
-					}
-				  }
-			  });
-			} else {
-				//open xd iframe
-				obj._getRemoteAuthorizationState();
-			}
+          if (this.messages) {	
+            //retrieves data from remote localStorage
+            XAuth.retrieve({
+            retrieve: [ key ],
+            callback: function(value) {
+              obj._updateSecret();
+              var notify = true;
+              if (tryRemote && (value.tokens[key] == null || ((obj.secret == null || obj.secret == "")&& cookie("mlsecret") == null)) ) {
+                //no data from iFrame - call login_status api
+                obj._getRemoteAuthorizationState();
+              } else {
+                //save authState in local variable
+                var authState = null
+                if (typeof(value.tokens[key]) != "undefined") {
+                  //decrypt
+                  var authState = null;
+                  try{ 
+                  authState = value.tokens[key].data;
+                    authState = obj._decryptAuthorizationState(authState);
+                    authState.expiration = authState.expire;
+                  } catch (e) {
+                    authState = null;
+                  }
+                  if (obj._isExpired(authState)  && tryRemote) {
+                    obj._getRemoteAuthorizationState();
+                    notify = false;
+                  }
+                }
+                if (notify) {
+                  obj.authorizationState[key] = authState;
+                  obj._onAuthorizationStateAvailable(authState);
+                }
+              }
+              }
+            });
+          } else {
+            //open xd iframe
+            obj._getRemoteAuthorizationState();
+          }
         },
 
         /**
@@ -477,34 +558,34 @@
               }
             }
         },
-		_notifyParent: function(message) {
-			var p = window.opener || window.parent;
-			if (typeof(p) == "undefined") return;
-			if (!this.messages) {
-				
-				if (message == "meli::loginComplete") 
-					p._loginComplete();
-				else if (message == "meli::authComplete") 
-					p._authComplete();
-				else if (message == "meli::logout") 
-					p._logoutComplete();
-				else if (message == "meli::close") 
-					p._logoutComplete();
-				
-			} else p.postMessage(JSON.stringify({cmd:message}), "*");
-		},
+        _notifyParent: function(message) {
+          var p = window.opener || window.parent;
+          if (typeof(p) == "undefined") return;
+          if (!this.messages) {
+            
+            if (message.class == "meli::loginComplete") 
+              p._loginComplete(message.secret);
+            else if (message.class == "meli::authComplete") 
+              p._authComplete(message.secret);
+            else if (message.class == "meli::logout") 
+              p._logoutComplete();
+            else if (message.class == "meli::close") 
+              p._logoutComplete();
+            
+          } else p.postMessage(JSON.stringify({cmd:message.class, data:message.secret}), "*");
+        },
         // Check if we're returning from a redirect
         // after authentication inside an iframe.
         _checkPostAuthorization : function() {
-			var p = window.opener || window.parent;
+            var p = window.opener || window.parent;
 			
             if (this.hash.state && this.hash.state == "iframe") {
-			  //returning from authorization (login)
+              //returning from authorization (login)
               if (!this.hash.error) {	
-				//TODO: Should remove this parsing
-				this.options = {client_id:
-                  RegExp("(APP_USR\\-)(\\d+)(\\-)").exec(this.hash.access_token)[2]
-                }
+                //TODO: Should remove this parsing
+                this.options = {client_id:
+                    RegExp("(APP_USR\\-)(\\d+)(\\-)").exec(this.hash.access_token)[2]
+                  }
                 var key = this._getKey();
                 //save in local storage the hash data
                 var authorizationState =  {
@@ -515,17 +596,16 @@
                         user_id: this.hash.user_id
                     }
                 };
-                this.store.set(key, JSON.stringify({
+                var secret = this.store.setSecure(key, {
                   key : key,
                   data : authorizationState,
                   expire : authorizationState.authorization_info.expires_in,
                   extend : [ "*" ]
-                }));
-
+                });
               }
-              this._notifyParent("meli::loginComplete");
+              this._notifyParent({class:"meli::loginComplete", secret:secret});
             } else if (this.hash.state) {
-			  //from Authorization State
+              //from Authorization State
               authorizationState = this.hash;
               var key = this.hash.client_id + this.AUTHORIZATION_STATE;
               if (!this.hash.authorization_info && (this.hash.state == "UNKNOWN" || this.hash.state=="NOT_AUTHORIZED")) {
@@ -538,23 +618,20 @@
                 var expiration = new Date().getTime() + (this.hash.authorization_info ? this.hash.authorization_info.expires_in* 1000 : 0);
                 this.hash.authorization_info.expires_in = expiration;
               }
-              this.store.set(key, JSON.stringify({
+              var secret = this.store.setSecure(key, {
                 key : key,
                 data : authorizationState,
                 expire : expiration ,
                 extend : [ "*" ]
-              }));
-              this._notifyParent("meli::authComplete");
-
+              });
+              this._notifyParent({class:"meli::authComplete", secret:secret});
             } else if (this.hash.action == "logout") {
-              this._notifyParent("meli::logout");
-              
+              this._notifyParent({class:"meli::logout"});
             }
-            
         },
 
-        _loginComplete : function() {
-            if (this._popupWindow) {
+        _loginComplete : function(secret) {
+           if (this._popupWindow) {
               var isModal = false;
               try {
                 isModal = this._popupWindow.type && this._popupWindow.type == "modal";
@@ -565,7 +642,7 @@
                 }
                 else 
                         this._popupWindow.postMessage(JSON.stringify({cmd:"meli::close"}), "*");
-            }
+           }
            //update our authorization credentials
            var self = this;
            this.authorizationStateAvailableCallbacks.push(function(authState) {
@@ -574,19 +651,27 @@
               while (self.pendingCallbacks.length > 0)
                   (self.pendingCallbacks.shift())();
            });
+           this._storeSecret(secret);
            this._synchronizeAuthorizationState(false);
           
         },
         _logoutComplete : function () {
+          this._storeSecret("");
           $('#logoutFrame').remove();
         },
-        _authComplete : function() {
+        _authComplete : function(secret) {
            //update our authorization credentials
            var self = this;
            this.authorizationStateAvailableCallbacks.push(function(authState) {
               self._triggerSessionChange();
            });
+           this._storeSecret(secret);
            this._synchronizeAuthorizationState(false);
+        },
+        _storeSecret: function(secret) {
+          //set cookie
+          cookie("mlsecret", JSON.stringify(secret), {domain:document.domain, path:"/"});
+          this.secret = secret;
         },
 
         _popup : function(url) {
@@ -614,6 +699,13 @@
           }
           return key;
           
+        },
+        _updateSecret : function() {
+          try {
+            this.secret = JSON.parse(cookie("mlsecret"));
+          } catch (e) {
+            this.secret = null;
+          }
         },
         _authorizationStateURL: function() {
           return this.authorizationStateURL.replace("SITE", this.appInfo.site_id.toLowerCase()) + "?client_id=" + this.options.client_id + "&redirect_uri=" + encodeURIComponent(this._xd_url()) + "&response_type=token";
