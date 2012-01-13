@@ -45,13 +45,13 @@ var XAuth = (function () {
             setTimeout(f, 0);
             return
         } else if (t.cmd == "meli::loginComplete") {
-          MercadoLibre._loginComplete(t.data);
+          MELI._loginComplete(t.data);
           return;
         } else if (t.cmd == "meli::authComplete") {
-          MercadoLibre._authComplete(t.data);
+          MELI._authComplete(t.data);
           return;
         } else if (t.cmd == "meli::logout") {
-          MercadoLibre._logoutComplete();
+          MELI._logoutComplete();
         } else if (t.cmd == "meli::close") {
           close();
         }
