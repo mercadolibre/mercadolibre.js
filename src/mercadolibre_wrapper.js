@@ -124,11 +124,13 @@ var cookie = function(name, value, options) {
         //skip subdomain
         var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
         cookie("orgapi", null, {domain:domain, path:"/"});
+        cookie("ats", null, {domain:domain, path:"/"});
+        MercadoLibre.isAuthorizationStateAvaible = false;
       }
       MercadoLibre._storeSecret = function(secret) {
           //skip subdomain
           var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
-          cookie("mlsecret", JSON.stringify(secret), {domain:domain, path:"/"});
+          cookie("ats", JSON.stringify(secret), {domain:domain, path:"/"});
           this.secret = secret;
       }
 
@@ -136,6 +138,13 @@ var cookie = function(name, value, options) {
           MercadoLibre.appInfo = {id: MercadoLibre.options.client_id, site_id: MercadoLibre.options.site_id};
           if (callback) callback();
         }
+    },
+    _expireToken : function(key) {
+        MercadoLibre.oldExpireToken(key);
+        //skip subdomain
+        var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
+        cookie("ats", null, {domain:domain, path:"/"});
+        MercadoLibre.isAuthorizationStateAvaible = false;
     },
     _partial: function (func /* , 0..n args */ ) {
       var args = Array.prototype.slice.call(arguments, 1);
@@ -146,7 +155,7 @@ var cookie = function(name, value, options) {
       };
     },
     getLoginStatus: function(callback, status) {
-      if (status.state == "AUTHORIZED") {
+      if (status && status.state == "AUTHORIZED") {
         //token circuit is OK, validate cookies
         if ((cookie("orgapi")== null || cookie("orgapi") == "0")&& (cookie("orgid") == null || cookie("orgid") == "0")) {
           MercadoLibre.logout();
@@ -155,8 +164,17 @@ var cookie = function(name, value, options) {
           //validate user id
           if (cookie("orguseridp") != null && cookie("orguseridp") != "0") {
             if (cookie("orguseridp") != status.authorization_info.user_id) {
-              MercadoLibre.logout();
-              status=null;
+          if (MercadoLibre.refreshing) {
+                MercadoLibre.logout();
+                MercadoLibre.refreshing = false;
+                status=null;
+              } else {
+                MercadoLibre.refreshing = true;
+                this._expireToken(MercadoLibre._getKey());
+                MercadoLibre.getLoginStatus(callback);
+                return;
+              }
+              
             }
           }
         } else if (cookie("orgid") != null && cookie("orgid") != "0") {
@@ -165,7 +183,8 @@ var cookie = function(name, value, options) {
           status.authorization_info.access_token = cookie("orgid");
           MercadoLibre.authorizationState[MercadoLibre._getKey()];
         }
-      } else if (status.state == "UNKNOWN" || status.state == "NOT_AUTHORIZED") {
+      } else if (status == null || status.state == "UNKNOWN" || status.state == "NOT_AUTHORIZED") {
+        status = MercadoLibre.unknownStatus;
         //if orgapi then is indeed authorized
         if (cookie("orgapi") != null && cookie("orgapi") != "0") {
           status.state = "AUTHORIZED";

@@ -56,7 +56,7 @@
             value.data = crypto;
             this.set(key, JSON.stringify(value));
             
-            return {secret:secret, length:data.length};
+            return {s:secret, l:data.length};
 
           }
 
@@ -102,9 +102,9 @@
         baseURL : "https://api.mercadolibre.com",
         authorizationURL : "http://auth.mercadolibre.com/authorization",
         authorizationStateURL : "https://www.mercadolibre.com/jms/SITE/oauth/authorization/state",
-        //authorizationStateURL : "https://auth.mercadolibre.com.ar/authorization/index",
-  
+        logoutURL : "http://DOMAIN/jm/logout?urlTo=",
         AUTHORIZATION_STATE : "authorization_state",
+        mlSites : {MLA:"com.ar",MLB:"com.br",MLU:"com.uy",MLC:"cl",MEC:"com.ec",MPE:"com.pe",MPT:"pt",MLV:"com.ve",MCO:"com.co",MCR:"co.cr",MPA:"com.pa",MRD:"com.do",MLM:"com.mx"},
         
         options: {},
         hash : {},
@@ -116,7 +116,10 @@
         authorizationState: {},
         authorizationStateAvailableCallbacks : [],
         authorizationStateCallbackInProgress : false,
+        authorizationStateCallbackTimer: null,
         synchronizationInProgress : false,
+        unknownStatus: {state:"UNKNOWN",authorization_info : {access_token: "",expires_in: 0,user_id: null}},
+        refreshing: false,
         showLogin: true,
         messages: (window.postMessage && window.localStorage && window.JSON),
         initialized: false,
@@ -135,14 +138,31 @@
 
             this.messages = (window.postMessage && window.localStorage && window.JSON);
 
-            if (this.options.sandbox) 
-                this.baseURL = this.baseURL.replace(/api\./, "sandbox.");
+            if (this.options.test) {
+                this.baseURL = this.options.test;
+                this.isAuthorizationStateAvaible = true;
+                var status = {
+                  state : "AUTHORIZED",
+                  authorization_info : {
+                    access_token: "faketoken",
+                    expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
+                    user_id: null
+                  }
+                }
+                this.authorizationState[this._getKey()] = status;
+            }            
             
-            if (this.options.test) 
-                this.baseURL = this.baseURL.replace(/https\./, "http.");
+            if (this.options.site_id == "MLB" || this.options.site_id == "MPT") {
+              this.authorizationURL = this.authorizationURL.replace("mercadolibre", "mercadolivre");
+              this.authorizationStateURL = this.authorizationStateURL.replace("mercadolibre", "mercadolivre");
+            }
+            
+            this.logoutURL = this.logoutURL.replace("DOMAIN", this._getDomain());
             
             if (!this.options.xauth_domain)
               this.options.xauth_domain = "static.mlstatic.com";
+            if (!this.options.auth_timeout)
+              this.options.auth_timeout = 3000;
 
             if (this.options.xauth_domain_fallback && !this.messages) 
               this.options.xauth_domain = this.options.xauth_domain_fallback;
@@ -165,7 +185,17 @@
               } catch(e){};
             }
         },
-        
+        _getDomain: function() {
+          if (this.mlSites[this.options.site_id] == null)
+            return null;
+          var domain = "www.mercadoli";
+          if (this.options.site_id == "MLB" ||  this.options.site_id == "MPT")
+            domain += "vre.";
+          else
+            domain += "bre.";
+          domain += this.mlSites[this.options.site_id];
+          return domain;
+        },
         waitForInit: function(callback) {
           if (this.initialized)
             callback();
@@ -192,8 +222,8 @@
           return false;
         },
       _decryptAuthorizationState: function(state) {
-          var retVal = this.store._decrypt(this.secret.secret, state);
-          var length = parseInt(this.secret.length);
+          var retVal = this.store._decrypt(this.secret.s, state);
+          var length = parseInt(this.secret.l);
           retVal = retVal.substring(0, length);
           retVal = JSON.parse(retVal);
           return retVal;
@@ -215,17 +245,17 @@
             callback: function(value) {
               obj._updateSecret();
               var notify = true;
-              if (tryRemote && (value.tokens[key] == null || ((obj.secret == null || obj.secret == "")&& cookie("mlsecret") == null)) ) {
+              if (tryRemote && (value.tokens[key] == null || ((obj.secret == null || obj.secret == "")&& (cookie("ats") == null || cookie("ats") == ""))) ) {
                 //no data from iFrame - call login_status api
                 obj._getRemoteAuthorizationState();
               } else {
                 //save authState in local variable
-                var authState = null
+                var authState = obj.unknownStatus;
                 if (typeof(value.tokens[key]) != "undefined") {
                   //decrypt
                   var authState = null;
                   try{ 
-                  authState = value.tokens[key].data;
+                    authState = value.tokens[key].data;
                     authState = obj._decryptAuthorizationState(authState);
                     authState.expiration = authState.expire;
                   } catch (e) {
@@ -261,6 +291,8 @@
           //if already in progress dismiss call and wait
           if (!this.authorizationStateCallbackInProgress) {
             this.authorizationStateCallbackInProgress = true;
+            //launch timer to catch timeout
+            this.authorizationStateCallbackTimer = setTimeout('MercadoLibre._authFail();',this.options.auth_timeout);
             if (this.appInfo == null) {
                 this._getApplicationInfo(this._authorize);
             } else {
@@ -289,8 +321,10 @@
           this.isAuthorizationStateAvaible = true;
           //there is a new auth state, session changed
           this._triggerSessionChange();
-          while (this.authorizationStateAvailableCallbacks.length > 0){
-            var callback = this.authorizationStateAvailableCallbacks.shift();
+
+          var localCallbacks = this.authorizationStateAvailableCallbacks.splice(0, this.authorizationStateAvailableCallbacks.length);
+          while (localCallbacks.length > 0){
+            var callback = localCallbacks.shift();
             callback(authorizationState);
           }
         },
@@ -332,6 +366,9 @@
 
           XAuth.expire({key:key});
           MercadoLibre.authorizationState[key] = null;
+          cookie("ats", null, {domain:document.domain, path:"/"});
+          this.secret = null;
+
         },
         tokenIssue: function(response) {
           return response[0] != 200 && (
@@ -495,14 +532,17 @@
                 callbacks[i].apply(null, args);
             }
         },
-
-        logout : function() {
+        refreshToken: function() {
           //expire xauth key
           XAuth.expire({key:this._getKey()});
           this.authorizationState[this._getKey()]=null;
+          this._synchronizeAuthorizationState(true);
+        },
+        logout : function() {
+          //expire xauth key
+          this._expireToken(this._getKey());
           //logout from meli
           this._iframe(this._logoutURL(), "logoutFrame");
-          this._triggerSessionChange();
         },
 
         _triggerSessionChange : function() {
@@ -563,16 +603,16 @@
           if (typeof(p) == "undefined") return;
           if (!this.messages) {
             
-            if (message.class == "meli::loginComplete") 
+            if (message.methodName == "meli::loginComplete") 
               p._loginComplete(message.secret);
-            else if (message.class == "meli::authComplete") 
+            else if (message.methodName == "meli::authComplete") 
               p._authComplete(message.secret);
-            else if (message.class == "meli::logout") 
+            else if (message.methodName == "meli::logout") 
               p._logoutComplete();
-            else if (message.class == "meli::close") 
+            else if (message.methodName == "meli::close") 
               p._logoutComplete();
             
-          } else p.postMessage(JSON.stringify({cmd:message.class, data:message.secret}), "*");
+          } else p.postMessage(JSON.stringify({cmd:message.methodName, data:message.secret}), "*");
         },
         // Check if we're returning from a redirect
         // after authentication inside an iframe.
@@ -603,7 +643,7 @@
                   extend : [ "*" ]
                 });
               }
-              this._notifyParent({class:"meli::loginComplete", secret:secret});
+              this._notifyParent({methodName:"meli::loginComplete", secret:secret});
             } else if (this.hash.state) {
               //from Authorization State
               authorizationState = this.hash;
@@ -624,9 +664,9 @@
                 expire : expiration ,
                 extend : [ "*" ]
               });
-              this._notifyParent({class:"meli::authComplete", secret:secret});
+              this._notifyParent({methodName:"meli::authComplete", secret:secret});
             } else if (this.hash.action == "logout") {
-              this._notifyParent({class:"meli::logout"});
+              this._notifyParent({methodName:"meli::logout"});
             }
         },
 
@@ -646,8 +686,6 @@
            //update our authorization credentials
            var self = this;
            this.authorizationStateAvailableCallbacks.push(function(authState) {
-              self._triggerSessionChange();
-
               while (self.pendingCallbacks.length > 0)
                   (self.pendingCallbacks.shift())();
            });
@@ -656,21 +694,34 @@
           
         },
         _logoutComplete : function () {
-          this._storeSecret("");
+          this._storeSecret(null);
           $('#logoutFrame').remove();
+          this._triggerSessionChange();
+        },
+        _authFail : function(secret) {
+           //update our authorization credentials
+           if( this.authorizationStateCallbackTimer) {
+             clearTimeout(this.authorizationStateCallbackTimer);
+             this.authorizationStateCallbackTimer = null;
+           }
+          MercadoLibre._iframe(MercadoLibre._xd_url());
+          MercadoLibre._authComplete(null);
+
         },
         _authComplete : function(secret) {
            //update our authorization credentials
+           if( this.authorizationStateCallbackTimer) {
+             clearTimeout(this.authorizationStateCallbackTimer);
+             this.authorizationStateCallbackTimer = null;
+           }
+            
            var self = this;
-           this.authorizationStateAvailableCallbacks.push(function(authState) {
-              self._triggerSessionChange();
-           });
            this._storeSecret(secret);
            this._synchronizeAuthorizationState(false);
         },
         _storeSecret: function(secret) {
           //set cookie
-          cookie("mlsecret", JSON.stringify(secret), {domain:document.domain, path:"/"});
+          cookie("ats", JSON.stringify(secret), {domain:document.domain, path:"/"});
           this.secret = secret;
         },
 
@@ -702,7 +753,7 @@
         },
         _updateSecret : function() {
           try {
-            this.secret = JSON.parse(cookie("mlsecret"));
+            this.secret = JSON.parse(unescape(cookie("ats")));
           } catch (e) {
             this.secret = null;
           }
@@ -714,7 +765,7 @@
             return this.authorizationURL + "?redirect_uri=" + encodeURIComponent(this._xd_url()) + "&response_type=token" + "&client_id=" + this.options.client_id + "&state=iframe" + "&display=popup" + "&interactive=" + (interactive ? 1 : 0);
         },
         _logoutURL: function() {
-            return "http://www.mercadolibre.com.ar/jm/logout?urlTo=" + encodeURIComponent(this._xd_url()+"#action=logout");
+            return this.logoutURL + encodeURIComponent(this._xd_url()+"#action=logout");
         },
         _xd_url: function() {
 			return "http://" + this.options.xauth_domain + (this.options.xauth_port ? ":" + this.options.xauth_port : "") + this.options.xd_url;
