@@ -1572,7 +1572,7 @@ var XAuth = (function () {
             window.document.body.appendChild(elem);
             elem.src = url;
           } else
-            iframe[0].src=url;
+            iframe.src=url;
           
         },
         _authorize: function () {
