@@ -1,0 +1,15 @@
+tests:
+
+/*circuito de autenticacion*/
+//las acciones de datos privados incluyen get post y remove
+Usuario no logueado accede a datos publicos
+Usuario no logueado accede a datos privados y se le muestra login, no se loguea
+Usuario no logueado accede a datos privados y se le muestra login, se loguea y no autoriza
+Usuario no logueado accede a datos privados y se le muestra login, se loguea y autoriza
+Usuario no logueado pero recordado accede a datos privados y se loguea en forma transparente
+Usuario logueado accede a datos publicos
+Usuario logueado accede a datos privados y se le muestra autorizacion y no autoriza
+Usuario logueado accede a datos privados y se le muestra autorizacion y autoriza
+
+Usuario logueado hace logout y accede a datos privados y se muestra login
+usuario no logueado hace login y luego accede a datos privados

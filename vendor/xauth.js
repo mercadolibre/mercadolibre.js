@@ -1,16 +1,38 @@
 var XAuth = (function () {
     var j = window;
     var q = !(j.postMessage && j.localStorage && j.JSON);
-    var n = "static.mlstatic.com" ;
-    var e = "http://" + n + ":8080/org-img/xAuthServer.htm";
+    var data = {
+      n: "static.mlstatic.com",
+      xdp: "/xd.html",
+      port: ""
+    }
+    
+    data.e = "http://" + data.n + (data.port?":"+data.port:"") + data.xdp;
     var g = null;
     var a = null;
     var p = {};
     var d = 0;
     var m = [];
-
+    var listeners = null;
+    function init() {
+      if (data) data.e = "http://" + data.n + (data.port?":"+data.port:"") + data.xdp;
+      if (listeners) return;
+      else {
+        if (j.addEventListener) {
+            j.addEventListener("message", o, false)
+        } else {
+            if (j.attachEvent) {
+                j.attachEvent("onmessage", o)
+            }
+        }
+        listeners = true;
+      }
+    }
     function o(s) {
+      //as xauth is not always initialized try/catch this
+      try {
         var u = s.origin.split("://")[1].split(":")[0];
+        var n = data.n;
         if (u != n) {
             return
         }
@@ -22,6 +44,16 @@ var XAuth = (function () {
             a = g.contentWindow;
             setTimeout(f, 0);
             return
+        } else if (t.cmd == "meli::loginComplete") {
+          MercadoLibre._loginComplete(t.data);
+          return;
+        } else if (t.cmd == "meli::authComplete") {
+          MercadoLibre._authComplete(t.data);
+          return;
+        } else if (t.cmd == "meli::logout") {
+          MercadoLibre._logoutComplete();
+        } else if (t.cmd == "meli::close") {
+          close();
         }
         var r = p[t.id];
         if (r) {
@@ -30,25 +62,23 @@ var XAuth = (function () {
             }
             delete p[t.id]
         }
+      } catch (error) {
+      }
     }
     function i() {
         if (g || a) {
+            g.src = data.e;
             return
         }
         var s = j.document;
         g = s.createElement("iframe");
+        g.id = "xauthIFrame";
         var r = g.style;
         r.position = "absolute";
         r.left = r.top = "-999px";
-        if (j.addEventListener) {
-            j.addEventListener("message", o, false)
-        } else {
-            if (j.attachEvent) {
-                j.attachEvent("onmessage", o)
-            }
-        }
         s.body.appendChild(g);
-        g.src = e
+        init();
+        g.src = data.e;
     }
     function f() {
         for (var r = 0; r < m.length; r++) {
@@ -56,10 +86,11 @@ var XAuth = (function () {
         }
     }
     function c(r) {
-        a.postMessage(JSON.stringify(r), e)
+        a.postMessage(JSON.stringify(r), data.e)
     }
     function h(r) {
         if (q) {
+          //postMessage not supported
             return
         }
         r.id = d;
@@ -103,11 +134,14 @@ var XAuth = (function () {
         }
         var s = {
             cmd: "xauth::expire",
+            key: r.key || null,
             callback: r.callback || null
         };
         h(s)
     }
     return {
+        init: init,
+        data: data,
         extend: k,
         retrieve: l,
         expire: b,

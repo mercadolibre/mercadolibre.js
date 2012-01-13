@@ -1,4 +1,166 @@
-(function() {
+;(function() {
+
+
+/*
+    http://www.JSON.org/json2.js
+    2010-08-25
+
+    Public Domain.
+
+    NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
+
+    See http://www.JSON.org/js.html
+
+
+    This code should be minified before deployment.
+    See http://javascript.crockford.com/jsmin.html
+
+    USE YOUR OWN COPY. IT IS EXTREMELY UNWISE TO LOAD CODE FROM SERVERS YOU DO
+    NOT CONTROL.
+
+
+    This file creates a global JSON object containing two methods: stringify
+    and parse.
+
+        JSON.stringify(value, replacer, space)
+            value       any JavaScript value, usually an object or array.
+
+            replacer    an optional parameter that determines how object
+                        values are stringified for objects. It can be a
+                        function or an array of strings.
+
+            space       an optional parameter that specifies the indentation
+                        of nested structures. If it is omitted, the text will
+                        be packed without extra whitespace. If it is a number,
+                        it will specify the number of spaces to indent at each
+                        level. If it is a string (such as '\t' or '&nbsp;'),
+                        it contains the characters used to indent at each level.
+
+            This method produces a JSON text from a JavaScript value.
+
+            When an object value is found, if the object contains a toJSON
+            method, its toJSON method will be called and the result will be
+            stringified. A toJSON method does not serialize: it returns the
+            value represented by the name/value pair that should be serialized,
+            or undefined if nothing should be serialized. The toJSON method
+            will be passed the key associated with the value, and this will be
+            bound to the value
+
+            For example, this would serialize Dates as ISO strings.
+
+                Date.prototype.toJSON = function (key) {
+                    function f(n) {
+                        // Format integers to have at least two digits.
+                        return n < 10 ? '0' + n : n;
+                    }
+
+                    return this.getUTCFullYear()   + '-' +
+                         f(this.getUTCMonth() + 1) + '-' +
+                         f(this.getUTCDate())      + 'T' +
+                         f(this.getUTCHours())     + ':' +
+                         f(this.getUTCMinutes())   + ':' +
+                         f(this.getUTCSeconds())   + 'Z';
+                };
+
+            You can provide an optional replacer method. It will be passed the
+            key and value of each member, with this bound to the containing
+            object. The value that is returned from your method will be
+            serialized. If your method returns undefined, then the member will
+            be excluded from the serialization.
+
+            If the replacer parameter is an array of strings, then it will be
+            used to select the members to be serialized. It filters the results
+            such that only members with keys listed in the replacer array are
+            stringified.
+
+            Values that do not have JSON representations, such as undefined or
+            functions, will not be serialized. Such values in objects will be
+            dropped; in arrays they will be replaced with null. You can use
+            a replacer function to replace those with JSON values.
+            JSON.stringify(undefined) returns undefined.
+
+            The optional space parameter produces a stringification of the
+            value that is filled with line breaks and indentation to make it
+            easier to read.
+
+            If the space parameter is a non-empty string, then that string will
+            be used for indentation. If the space parameter is a number, then
+            the indentation will be that many spaces.
+
+            Example:
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}]);
+            // text is '["e",{"pluribus":"unum"}]'
+
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}], null, '\t');
+            // text is '[\n\t"e",\n\t{\n\t\t"pluribus": "unum"\n\t}\n]'
+
+            text = JSON.stringify([new Date()], function (key, value) {
+                return this[key] instanceof Date ?
+                    'Date(' + this[key] + ')' : value;
+            });
+            // text is '["Date(---current time---)"]'
+
+
+        JSON.parse(text, reviver)
+            This method parses a JSON text to produce an object or array.
+            It can throw a SyntaxError exception.
+
+            The optional reviver parameter is a function that can filter and
+            transform the results. It receives each of the keys and values,
+            and its return value is used instead of the original value.
+            If it returns what it received, then the structure is not modified.
+            If it returns undefined then the member is deleted.
+
+            Example:
+
+            // Parse the text. Values that look like ISO date strings will
+            // be converted to Date objects.
+
+            myData = JSON.parse(text, function (key, value) {
+                var a;
+                if (typeof value === 'string') {
+                    a =
+/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$/.exec(value);
+                    if (a) {
+                        return new Date(Date.UTC(+a[1], +a[2] - 1, +a[3], +a[4],
+                            +a[5], +a[6]));
+                    }
+                }
+                return value;
+            });
+
+            myData = JSON.parse('["Date(09/09/2001)"]', function (key, value) {
+                var d;
+                if (typeof value === 'string' &&
+                        value.slice(0, 5) === 'Date(' &&
+                        value.slice(-1) === ')') {
+                    d = new Date(value.slice(5, -1));
+                    if (d) {
+                        return d;
+                    }
+                }
+                return value;
+            });
+
+
+    This is a reference implementation. You are free to copy, modify, or
+    redistribute.
+*/
+
+/*jslint evil: true, strict: false */
+
+/*members "", "\b", "\t", "\n", "\f", "\r", "\"", JSON, "\\", apply,
+    call, charCodeAt, getUTCDate, getUTCFullYear, getUTCHours,
+    getUTCMinutes, getUTCMonth, getUTCSeconds, hasOwnProperty, join,
+    lastIndex, length, parse, prototype, push, replace, slice, stringify,
+    test, toJSON, toString, valueOf
+*/
+
+
+// Create a JSON object only if one does not already exist. We create the
+// methods in a closure to avoid creating global variables.
 
 if (!this.JSON) {
     this.JSON = {};
@@ -320,164 +482,90 @@ if (!this.JSON) {
             throw new SyntaxError('JSON.parse');
         };
     }
-}())})();
+}());
 
-(function () {
-    var g = window;
-    if (g.top == g) {
-        return
-    }
-    if (!g.postMessage || !g.localStorage || !g.JSON) {
-        return
-    }
-    var d = g.localStorage;
-    var a = null;
-    var f = document.cookie.match(/(?:^|;)\s*session=(\d+)(?:;|$)/);
-    if (f && f.length) {
-        a = f[1]
-    }
-    if (!a) {
-        a = new Date().getTime();
-        document.cookie = ("session=" + a + "; ")
-    }
-    var b = {
-        "xauth::extend": function (l, m) {
-            if (!m.data) {
-                i(m, "Invalid", origin);
-                return null
-            }
-            m.data = String(m.data);
-            m.expire = Number(m.expire);
-            var k = new Date(m.expire);
-            if (k < new Date()) {
-                i(m, "Invalid Expiration", origin);
-                return null
-            }
-            if (!m.extend || !m.extend.length) {
-                i(m, "No Extend List Specified", origin);
-                return null
-            }
-            var j = {
-                data: JSON.parse(m.data),
-                expire: m.expire,
-                extend: m.extend
-            };
-            if (m.session === true) {
-                j.session = a
-            }
-            d.setItem(m.key, JSON.stringify(j));
-            return {
-                cmd: m.cmd,
-                id: m.id
-            }
-        },
-        "xauth::retrieve": function (t, l) {
-            if (!l.retrieve || !l.retrieve.length) {
-                i(l, "No Retrieve List Requested", origin);
-                return null
-            }
-            var q = {};
-            var k = false;
-            for (var p = 0; p < l.retrieve.length; p++) {
-                var s = l.retrieve[p];
-                var n = d.getItem(s);
-                var r = null;
-                try {
-                  r = n ? JSON.parse(n) : null;
-                  if (r && !r.block) {
-                      var u = (t==s);
-                      if (!u) {
-                          for (var o = 0; o < r.extend.length; o++) {
-                              if (r.extend[o] == "*" || t.match(eval(r.extend[o]))) {
-                                  u = true;
-                                  break
-                              }
-                          }
-                      }
 
-                      if (u) {
-                          var m = new Date(r.expire);
-                          if (m < new Date()) {
-                              d.removeItem(s);
-                              continue
-                          }
-                          if (r.session && r.session != a) {
-                              d.removeItem(s);
-                              continue
-                          }
-                          q[s] = {
-                              data: r.data,
-                              expire: r.expire
-                          }
-                      }
-                  }
-                } catch (e) {
-                  d.removeItem(s);
-                  q = [];
-                }
-            }
-            return {
-                cmd: l.cmd,
-                id: l.id,
-                tokens: q
-            }
-        },
-        "xauth::expire": function (j, k) {
-            d.removeItem(k.key);
-            return {
-                cmd: k.cmd,
-                id: k.id
-            }
-        },
-        "meli::logout": function (j, k) {
-            d.removeItem(j);
-            return {
-                cmd: k.cmd,
-                id: k.id
-            }
-        },
-        "meli::close": function (j, k) {
-          close();
-        }
-        
-    };
+var Sroc = (function() {
+  return {
+    counter: 1,
 
-    function i(l, k, j) {
-        if (!l || (typeof l.id != "number")) {
-            return
+    get: function(url, params, callback) {
+      this.request("GET", url, params, callback)
+    },
+
+    post: function(url, params, callback) {
+      this.request("POST", url, params, callback)
+    },
+    remove: function(url, params, callback) {
+		this.request("DELETE", url, params, callback)
+	},
+
+    request: function(method, url, params, callback) {
+      var name = this._callbackName();
+
+      window[name] = function(status, headers, body) {
+        callback.call(null, status, headers, body);
+
+        window[name] = null;
+
+        try {
+          delete window[name];
         }
-        if (g.console && g.console.log) {
-            g.console.log(l.cmd + " Error: " + k)
+        catch (e) { }
+      }
+
+      this.load(this.url(method, url, params, name));
+    },
+
+    load: function(url) {
+      var done = false;
+      var script = document.createElement("script");
+
+      script.src = url + (url.indexOf("?") > -1 ? "&" : "?") + "_MELI_SDK_RANDOM=" + Math.random()*Math.random();
+      script.async = true;
+
+      script.onload = script.onreadystatechange = function() {
+        if (!done && (!this.readyState || this.readyState === "loaded" || this.readyState === "complete")) {
+          done = true;
+          script.onload = script.onreadystatechange = null;
+          if (script && script.parentNode) {
+            script.parentNode.removeChild(script)
+          }
         }
+      }
+
+      document.getElementsByTagName("head")[0].appendChild(script)
+    },
+
+    url: function(method, url, params, callbackName) {
+      var key;
+
+      url += url.indexOf("?") > -1 ? "&" : "?";
+
+      url += "callback=" + callbackName;
+
+      if (method == "GET") {
+        for (key in params) {
+          if (params.hasOwnProperty(key)) {
+            url += "&" + key + "=" + encodeURIComponent(params[key])
+          }
+        }
+      }
+      else {
+        url += "&_method=" + method + "&_body=" + encodeURIComponent(JSON.stringify(params))
+      }
+
+      return url
+    },
+
+    _callbackName: function() {
+      return "jsonp" + (this.counter++)
     }
-    function c(j, k) {
-        if (!j || (typeof j.id != "number") || typeof(g.parent.postMessage) == undefined) {
-            return
-        }
-        g.parent.postMessage(JSON.stringify(j), k)
-    }
-    function e() {
-        return (d.getItem("disabled.xauth.org") == "1")
-    }
-    function h(j) {
-        var k = j.origin.split("://")[1].split(":")[0],
-            l = JSON.parse(j.data);
-        if (!l || typeof l != "object" || !l.cmd || l.id == undefined || e()) {
-            return
-        }
-        if (b[l.cmd]) {
-            c(b[l.cmd](k, l), j.origin)
-        }
-    }
-    if (g.addEventListener) {
-        g.addEventListener("message", h, false)
-    } else {
-        if (g.attachEvent) {
-            g.attachEvent("onmessage", h)
-        }
-    }
-    if (typeof(g.parent.postMessage) != "undefined")
-      g.parent.postMessage(JSON.stringify({
-          cmd: "xauth::ready"
-      }), "*")
-})(); 
+  }
+})();
+
+window.Sroc = Sroc;
+
+
+
+})();

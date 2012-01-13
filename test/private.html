@@ -1,0 +1,35 @@
+<html>
+<head>
+  <meta name="generator" content="HTML Tidy for Linux/x86 (vers 25 March 2009), see www.w3.org">
+  <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+  <script src="jquery.js"></script>
+  <script src="mercadolibre.js" charset="utf-8"></script>
+<title></title>
+</head>
+
+<body>
+  <div id="status"></div>
+  <div id="results"></div>
+  <script>
+    function searchItems() {
+      MercadoLibre.get("/users/me",
+        {},
+        function(response) {
+          $('#status').html(response[0]);
+          if (response[2].paging && response[2].paging.total)
+            $('#results').html(response[2].paging.total);
+        });
+    };
+    
+    postMessage=undefined;
+    alert('hola');
+    $(document).ready(function(){
+      alert(location.href);
+      MercadoLibre.init({ client_id: 3096, xauth_port:8080 , xauth_domain_fallback: 'www.mercadolibre.com.ar'});
+      
+      searchItems();
+      
+    });
+  </script>
+</body>
+</html>
