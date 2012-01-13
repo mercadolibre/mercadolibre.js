@@ -753,7 +753,8 @@
         },
         _updateSecret : function() {
           try {
-            this.secret = JSON.parse(unescape(cookie("ats")));
+            if (cookie("ats") != null)
+              this.secret = JSON.parse(unescape(cookie("ats")));
           } catch (e) {
             this.secret = null;
           }
