@@ -94,7 +94,7 @@
             }
         },
         "xauth::expire": function (j, k) {
-            d.removeItem(j);
+            d.removeItem(k.key);
             return {
                 cmd: k.cmd,
                 id: k.id

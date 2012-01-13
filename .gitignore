@@ -1,3 +1,5 @@
 /pkg
-/tmp
 /*~
+/bak/
+/temp/
+/*.log
