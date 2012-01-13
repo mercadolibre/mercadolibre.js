@@ -1160,7 +1160,7 @@ var XAuth = (function () {
 
     var Sroc = window.Sroc;
 
-    var MercadoLibre = {
+    var MELI = {
         baseURL : "https://api.mercadolibre.com",
         authorizationURL : "http://auth.mercadolibre.com/authorization",
         authorizationStateURL : "https://www.mercadolibre.com/jms/SITE/oauth/authorization/state",
@@ -1230,7 +1230,7 @@ var XAuth = (function () {
               this.options.xauth_domain = this.options.xauth_domain_fallback;
               
             if (!this.options.xd_url)
-              this.options.xd_url = "/xd.html";
+              this.options.xd_url = "/xd_sdk.html";
             if (typeof(this.options.show_login) != "undefined")
               this.showLogin = this.options.show_login;
             
@@ -1354,7 +1354,7 @@ var XAuth = (function () {
           if (!this.authorizationStateCallbackInProgress) {
             this.authorizationStateCallbackInProgress = true;
             //launch timer to catch timeout
-            this.authorizationStateCallbackTimer = setTimeout('MercadoLibre._authFail();',this.options.auth_timeout);
+            this.authorizationStateCallbackTimer = setTimeout('MELI._authFail();',this.options.auth_timeout);
             if (this.appInfo == null) {
                 this._getApplicationInfo(this._authorize);
             } else {
@@ -1427,7 +1427,7 @@ var XAuth = (function () {
           }
 
           XAuth.expire({key:key});
-          MercadoLibre.authorizationState[key] = null;
+          MELI.authorizationState[key] = null;
           cookie("ats", null, {domain:document.domain, path:"/"});
           this.secret = null;
 
@@ -1576,7 +1576,7 @@ var XAuth = (function () {
           
         },
         _authorize: function () {
-          MercadoLibre._iframe(MercadoLibre._authorizationStateURL());
+          MELI._iframe(MELI._authorizationStateURL());
         },
         bind : function(event, callback) {
             if (typeof (this.callbacks[event]) == "undefined")
@@ -1770,8 +1770,8 @@ var XAuth = (function () {
              clearTimeout(this.authorizationStateCallbackTimer);
              this.authorizationStateCallbackTimer = null;
            }
-          MercadoLibre._iframe(MercadoLibre._xd_url());
-          MercadoLibre._authComplete(null);
+          MELI._iframe(MELI._xd_url());
+          MELI._authComplete(null);
 
         },
         _authComplete : function(secret) {
@@ -1840,11 +1840,13 @@ var XAuth = (function () {
         
     };
 
-    MercadoLibre._parseHash();
+    MELI._parseHash();
 
-    MercadoLibre._checkPostAuthorization();
+    MELI._checkPostAuthorization();
 
-    window.MercadoLibre = MercadoLibre;
+    window.MELI = MELI;
+    if (typeof(window.mlAsyncInit) == "function")
+      window.mlAsyncInit();
 
 })(cookie, XAuth);
 
