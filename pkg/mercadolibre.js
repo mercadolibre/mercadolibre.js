@@ -1230,7 +1230,7 @@ var XAuth = (function () {
               this.options.xauth_domain = this.options.xauth_domain_fallback;
               
             if (!this.options.xd_url)
-              this.options.xd_url = "/xd_sdk.html";
+              this.options.xd_url = "/org-img/sdk/xd_sdk.html";
             if (typeof(this.options.show_login) != "undefined")
               this.showLogin = this.options.show_login;
             
