@@ -668,6 +668,7 @@
             } else if (this.hash.action == "logout") {
               this._notifyParent({methodName:"meli::logout"});
             }
+            if (top === self) close(); 
         },
 
         _loginComplete : function(secret) {
@@ -681,7 +682,7 @@
                         this._popupWindow = null;
                 }
                 else 
-                        this._popupWindow.postMessage(JSON.stringify({cmd:"meli::close"}), "*");
+                        this._popupWindow.postMessage(JSON.stringify({cmd:"meli::close", id:"-1"}), "*");
            }
            //update our authorization credentials
            var self = this;
