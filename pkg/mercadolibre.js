@@ -1680,7 +1680,7 @@ var XAuth = (function () {
         // after authentication inside an iframe.
         _checkPostAuthorization : function() {
             var p = window.opener || window.parent;
-			
+            var shouldClose = false;
             if (this.hash.state && this.hash.state == "iframe") {
               //returning from authorization (login)
               if (!this.hash.error) {	
@@ -1706,6 +1706,7 @@ var XAuth = (function () {
                 });
               }
               this._notifyParent({methodName:"meli::loginComplete", secret:secret});
+              shouldClose = true;
             } else if (this.hash.state) {
               //from Authorization State
               authorizationState = this.hash;
@@ -1727,10 +1728,12 @@ var XAuth = (function () {
                 extend : [ "*" ]
               });
               this._notifyParent({methodName:"meli::authComplete", secret:secret});
+              shouldClose = true;
             } else if (this.hash.action == "logout") {
               this._notifyParent({methodName:"meli::logout"});
+              shouldClose = true;
             }
-            if (top === self) close(); 
+            if (shouldClose && top === self) close(); 
         },
 
         _loginComplete : function(secret) {
