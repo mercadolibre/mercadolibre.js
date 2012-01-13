@@ -1562,7 +1562,7 @@ var XAuth = (function () {
         _iframe: function(url, id) {
           if (!id)
             id = "xauthIFrame";
-          var iframe = $("#" + id);
+          var iframe = document.getElementById(id);
           if (!iframe || iframe.length == 0) {
             var elem = window.document.createElement("iframe");
             var r = elem.style;
@@ -1757,7 +1757,7 @@ var XAuth = (function () {
         },
         _logoutComplete : function () {
           this._storeSecret(null);
-          $('#logoutFrame').remove();
+          document.body.removeChild(document.getElementById('logoutFrame'));
           this._triggerSessionChange();
         },
         _authFail : function(secret) {
