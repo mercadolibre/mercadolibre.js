@@ -1224,7 +1224,7 @@ var XAuth = (function () {
             if (!this.options.xauth_domain)
               this.options.xauth_domain = "static.mlstatic.com";
             if (!this.options.auth_timeout)
-              this.options.auth_timeout = 3000;
+              this.options.auth_timeout = 10000;
 
             if (this.options.xauth_domain_fallback && !this.messages) 
               this.options.xauth_domain = this.options.xauth_domain_fallback;
