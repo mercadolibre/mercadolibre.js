@@ -3,9 +3,11 @@ require "tmpdir"
 require "erb"
 
 BUILD = [
+  "vendor/json2.js",
   "vendor/cookie.js",
   "vendor/des.js",
   "tmp/sroc.js",
+  "vendor/xAuthServer.js",
   "vendor/xauth.js",
   "src/mercadolibre.js",
 ]
@@ -35,7 +37,7 @@ file "mercadolibre.js" => ["pkg", "sroc.js"] do |t|
 end
 
 task :minify do
-  system "java -jar vendor/yuicompressor-2.4.2.jar --type js pkg/mercadolibre.js -o pkg/mercadolibre.min.js"
+  system "java -jar vendor/compiler.jar --warning_level VERBOSE --charset utf-8 --compilation_level SIMPLE_OPTIMIZATIONS --js pkg/mercadolibre.js --js_output_file pkg/mercadolibre.min.js"
 end
 
 task :build => "mercadolibre.js" do
