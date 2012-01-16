@@ -125,6 +125,7 @@
 		authorizationStateCallbackInProgress : false,
 		authorizationStateCallbackTimer : null,
 		synchronizationInProgress : false,
+    postLoginCallback: null,
 		unknownStatus : {
 			state : "UNKNOWN",
 			authorization_info : {
