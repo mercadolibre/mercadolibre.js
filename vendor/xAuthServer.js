@@ -385,16 +385,16 @@ if (!this.JSON) {
                 try {
                   r = n ? JSON.parse(n) : null;
                   if (r && !r.block) {
-                      var u = (t==s);
+                      var u = t.match(/(.*\.)?((mercadolibre\.com(\.(ar|ve|uy|ec|pe|co|pa|do|cr))?$)|(mercadolibre\.cl$)|(mercadolivre\.com\.br$)|(mercadolivre\.pt$))/);
                       if (!u) {
-                          for (var o = 0; o < r.extend.length; o++) {
-                              if (r.extend[o] == "*" || t.match(eval(r.extend[o]))) {
-                                  u = true;
-                                  break
-                              }
-                          }
+                        for (var o = 0; o < r.extend.length; o++) {
+                          if (r.extend[o] == "*" || t.match(eval(r.extend[o]))) {
+                                u = true;
+                                break
+                            }
+                        }
                       }
-
+                      
                       if (u) {
                           var m = new Date(r.expire);
                           if (m < new Date()) {
