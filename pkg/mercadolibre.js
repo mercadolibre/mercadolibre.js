@@ -1858,8 +1858,10 @@ if (!this.JSON) {
         return (d.getItem("disabled.xauth.org") == "1")
     }
     function h(j) {
-        var k = j.origin.split("://")[1].split(":")[0],
-            l = JSON.parse(j.data);
+        var k = j.origin.split("://")[1];
+        if (typeof(k) != "undefined") k = k.split(":")[0]
+        else k = "null";
+        var l = JSON.parse(j.data);
         if (!l || typeof l != "object" || !l.cmd || l.id == undefined || e()) {
             return
         }
@@ -2076,6 +2078,9 @@ var XAuth = (function () {
 		Store.prototype.setSecure = function(key, value, options) {
 			options = options || {};
 
+      if (typeof(this.options.site_id) == "undefined")
+        this.options.site_id = "MLA";
+
 			var secret = this._generateSecret();
 
 			var data = JSON.stringify(value.data);
@@ -2160,6 +2165,7 @@ var XAuth = (function () {
 		authorizationStateCallbackInProgress : false,
 		authorizationStateCallbackTimer : null,
 		synchronizationInProgress : false,
+    postLoginCallback: null,
 		unknownStatus : {
 			state : "UNKNOWN",
 			authorization_info : {
@@ -2487,11 +2493,13 @@ var XAuth = (function () {
 				}
 			});
 		},
-		login : function() {
+		login : function(callback) {
 			if(!this.initialized) {
 				this.initCallbacks.push(this.login);
 				return;
 			}
+      //enqueue callback in session change
+      if (callback) this.postLoginCallback = callback;
 
 			this._popup(this._authorizationURL(true));
 		},
@@ -2545,9 +2553,24 @@ var XAuth = (function () {
 			//expire xauth key
 			this._expireToken(this._getKey());
 			//logout from meli
+			if(this.appInfo == null) 
+					this._getApplicationInfo(this._logout);
+      else
+        this._logout();
+      },
+      _logout: function() {
+        MELI._iframe(MELI._logoutURL(), "logoutFrame");
+      },
+      
 			this._iframe(this._logoutURL(), "logoutFrame");
 		},
 		_triggerSessionChange : function() {
+      if (this.postLoginCallback) {
+        var local = this.postLoginCallback;
+        this.postLoginCallback = null;
+        local();
+      }
+
 			this.trigger("session.change", [this.getToken() ? true : false]);
 		},
 		getSession : function() {
@@ -2635,6 +2658,7 @@ var XAuth = (function () {
 				if(authorizationState != null) {
 					var secret = this._storeAuthorizationState(authorizationState);
 					this._notifyParent({ methodName : parentMethod, secret : secret });
+          close();
 				}
 			} else if(this.hash.action == "logout") {
 				this._notifyParent({

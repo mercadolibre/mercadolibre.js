@@ -41,6 +41,9 @@
 		Store.prototype.setSecure = function(key, value, options) {
 			options = options || {};
 
+      if (typeof(this.options.site_id) == "undefined")
+        this.options.site_id = "MLA";
+
 			var secret = this._generateSecret();
 
 			var data = JSON.stringify(value.data);
@@ -453,11 +456,13 @@
 				}
 			});
 		},
-		login : function() {
+		login : function(callback) {
 			if(!this.initialized) {
 				this.initCallbacks.push(this.login);
 				return;
 			}
+      //enqueue callback in session change
+      if (callback) this.postLoginCallback = callback;
 
 			this._popup(this._authorizationURL(true));
 		},
@@ -511,9 +516,24 @@
 			//expire xauth key
 			this._expireToken(this._getKey());
 			//logout from meli
+			if(this.appInfo == null) 
+					this._getApplicationInfo(this._logout);
+      else
+        this._logout();
+      },
+      _logout: function() {
+        MELI._iframe(MELI._logoutURL(), "logoutFrame");
+      },
+      
 			this._iframe(this._logoutURL(), "logoutFrame");
 		},
 		_triggerSessionChange : function() {
+      if (this.postLoginCallback) {
+        var local = this.postLoginCallback;
+        this.postLoginCallback = null;
+        local();
+      }
+
 			this.trigger("session.change", [this.getToken() ? true : false]);
 		},
 		getSession : function() {
@@ -601,6 +621,7 @@
 				if(authorizationState != null) {
 					var secret = this._storeAuthorizationState(authorizationState);
 					this._notifyParent({ methodName : parentMethod, secret : secret });
+          close();
 				}
 			} else if(this.hash.action == "logout") {
 				this._notifyParent({
