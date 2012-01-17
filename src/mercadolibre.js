@@ -41,9 +41,6 @@
 		Store.prototype.setSecure = function(key, value, options) {
 			options = options || {};
 
-      if (typeof(this.options.site_id) == "undefined")
-        this.options.site_id = "MLA";
-
 			var secret = this._generateSecret();
 
 			var data = JSON.stringify(value.data);
@@ -153,6 +150,9 @@
 		//initialization: set base domains an url. Initialize XAuth on base window
 		init : function(options) {
 			this.options = options;
+
+      if (typeof(this.options.site_id) == "undefined")
+        this.options.site_id = "MLA";
 
 			this.messages = (window.postMessage && window.localStorage && window.JSON);
 
@@ -520,13 +520,10 @@
 					this._getApplicationInfo(this._logout);
       else
         this._logout();
-      },
-      _logout: function() {
-        MELI._iframe(MELI._logoutURL(), "logoutFrame");
-      },
-      
-			this._iframe(this._logoutURL(), "logoutFrame");
-		},
+    },
+    _logout: function() {
+      MELI._iframe(MELI._logoutURL(), "logoutFrame");
+    },
 		_triggerSessionChange : function() {
       if (this.postLoginCallback) {
         var local = this.postLoginCallback;
