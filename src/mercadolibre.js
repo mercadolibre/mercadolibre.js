@@ -657,19 +657,20 @@
 						access_token : this.hash.access_token,
 						expires_in : new Date(new Date().getTime() + parseInt(this.hash.expires_in) * 1000).getTime(),
 						user_id : this.hash.user_id
-					}
+					},
+          extend_domains: this.hash.extend_domains
 				};
 			}
 			return authorizationState;
 		},
 		_storeAuthorizationState:function(authorizationState){
-			var extendDomains = (this.options.domain ? [this.options.domain] : ["*"]);
+			//var extendDomains = (this.options.domain ? [this.options.domain] : ["*"]);
 			var key = this._getKey();
 			var secret = this.store.setSecure(key, {
 				key : key,
 				data : authorizationState,
 				expire : authorizationState.authorization_info.expires_in,
-				extend : extendDomains
+				extend : authorizationState.extend_domains
 			});
 			return secret;
 		},
