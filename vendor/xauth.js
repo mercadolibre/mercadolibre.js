@@ -45,15 +45,15 @@ var XAuth = (function () {
             setTimeout(f, 0);
             return
         } else if (t.cmd == "meli::loginComplete") {
-          MELI._loginComplete(t.data);
+          window.MELI._loginComplete(t.data);
           return;
         } else if (t.cmd == "meli::authComplete") {
-          MELI._authComplete(t.data);
+          window.MELI._authComplete(t.data);
           return;
         } else if (t.cmd == "meli::logout") {
-          MELI._logoutComplete();
+          window.MELI._logoutComplete();
         } else if (t.cmd == "meli::close") {
-          close();
+          window.close();
         }
         var r = p[t.id];
         if (r) {
