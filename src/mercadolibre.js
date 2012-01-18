@@ -190,6 +190,11 @@
 				}
 			};
 			this.authorizationState[this._getKey()] = status;
+      var obj = this;
+      this._synchronizeAuthorizationState = function () {
+        obj.authorizationState[obj._getKey()] = status;
+        this._onAuthorizationStateAvailable(status);
+      }
 		},
 		_initXAuthClient: function() {
 			if(!this.options.xauth_domain)
