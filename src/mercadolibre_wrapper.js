@@ -108,43 +108,43 @@ var cookie = function(name, value, options) {
 (function(cookie) {
   var MercadoLibreW = {
     init: function() {
-      if (typeof(MercadoLibre) === "undefined") {
+      if (typeof(window.MELI) === "undefined") {
         setTimeout('MercadoLibreW.init()', 50);
         return;
       }
-      MercadoLibre.oldGetLoginStatus = MercadoLibre.getLoginStatus;
-      MercadoLibre.oldExpireToken = MercadoLibre._expireToken;
+      window.MELI.oldGetLoginStatus = window.MELI.getLoginStatus;
+      window.MELI.oldExpireToken = window.MELI._expireToken;
       var self = this;
-      MercadoLibre.getLoginStatus = function(callback) {
+      window.MELI.getLoginStatus = function(callback) {
         var newCallback = self._partial(self.getLoginStatus, callback);
-        MercadoLibre.oldGetLoginStatus(newCallback);
+        window.MELI.oldGetLoginStatus(newCallback);
       }
-      MercadoLibre._expireToken = function(key) {
-        MercadoLibre.oldExpireToken(key);
+      window.MELI._expireToken = function(key) {
+        window.MELI.oldExpireToken(key);
         //skip subdomain
         var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
         cookie("orgapi", null, {domain:domain, path:"/"});
         cookie("ats", null, {domain:domain, path:"/"});
-        MercadoLibre.isAuthorizationStateAvaible = false;
+        window.MELI.isAuthorizationStateAvaible = false;
       }
-      MercadoLibre._storeSecret = function(secret) {
+      window.MELI._storeSecret = function(secret) {
           //skip subdomain
           var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
           cookie("ats", JSON.stringify(secret), {domain:domain, path:"/"});
           this.secret = secret;
       }
 
-      MercadoLibre._getApplicationInfo = function(callback) {
-          MercadoLibre.appInfo = {id: MercadoLibre.options.client_id, site_id: MercadoLibre.options.site_id};
+      window.MELI._getApplicationInfo = function(callback) {
+          window.MELI.appInfo = {id: window.MELI.options.client_id, site_id: window.MELI.options.site_id};
           if (callback) callback();
         }
     },
     _expireToken : function(key) {
-        MercadoLibre.oldExpireToken(key);
+        window.MELI.oldExpireToken(key);
         //skip subdomain
         var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
         cookie("ats", null, {domain:domain, path:"/"});
-        MercadoLibre.isAuthorizationStateAvaible = false;
+        window.MELI.isAuthorizationStateAvaible = false;
     },
     _partial: function (func /* , 0..n args */ ) {
       var args = Array.prototype.slice.call(arguments, 1);
@@ -158,20 +158,20 @@ var cookie = function(name, value, options) {
       if (status && status.state == "AUTHORIZED") {
         //token circuit is OK, validate cookies
         if ((cookie("orgapi")== null || cookie("orgapi") == "0")&& (cookie("orgid") == null || cookie("orgid") == "0")) {
-          MercadoLibre.logout();
+          window.MELI.logout();
           status=null;
         } else if (cookie("orgapi") != null && cookie("orgapi") != "0") {
           //validate user id
           if (cookie("orguseridp") != null && cookie("orguseridp") != "0") {
             if (cookie("orguseridp") != status.authorization_info.user_id) {
-          if (MercadoLibre.refreshing) {
-                MercadoLibre.logout();
-                MercadoLibre.refreshing = false;
+          if (window.MELI.refreshing) {
+                window.MELI.logout();
+                window.MELI.refreshing = false;
                 status=null;
               } else {
-                MercadoLibre.refreshing = true;
-                this._expireToken(MercadoLibre._getKey());
-                MercadoLibre.getLoginStatus(callback);
+                window.MELI.refreshing = true;
+                this._expireToken(window.MELI._getKey());
+                window.MELI.getLoginStatus(callback);
                 return;
               }
               
@@ -181,10 +181,10 @@ var cookie = function(name, value, options) {
           //identified user
           status.state = "IDENTIFIED";
           status.authorization_info.access_token = cookie("orgid");
-          MercadoLibre.authorizationState[MercadoLibre._getKey()] = status;
+          window.MELI.authorizationState[window.MELI._getKey()] = status;
         }
       } else if (status == null || status.state == "UNKNOWN" || status.state == "NOT_AUTHORIZED") {
-        status = MercadoLibre.unknownStatus;
+        status = window.MELI.unknownStatus;
         //if orgapi then is indeed authorized
         if (cookie("orgapi") != null && cookie("orgapi") != "0") {
           status.state = "AUTHORIZED";
@@ -193,7 +193,7 @@ var cookie = function(name, value, options) {
             expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
             user_id: null
           }
-          MercadoLibre.authorizationState[MercadoLibre._getKey()] = status;
+          window.MELI.authorizationState[window.MELI._getKey()] = status;
         } else if (cookie("orgid") != null && cookie("orgid") != "0") {
           //identified user
           status.state = "IDENTIFIED";
@@ -202,7 +202,7 @@ var cookie = function(name, value, options) {
             expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
             user_id: null
           }
-          MercadoLibre.authorizationState[MercadoLibre._getKey()] = status;
+          window.MELI.authorizationState[window.MELI._getKey()] = status;
         }
       }
       callback(status);
