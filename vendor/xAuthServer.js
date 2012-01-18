@@ -341,37 +341,7 @@ if (!this.JSON) {
         document.cookie = ("session=" + a + "; ")
     }
     var b = {
-        "xauth::extend": function (l, m) {
-            if (!m.data) {
-                i(m, "Invalid", origin);
-                return null
-            }
-            m.data = String(m.data);
-            m.expire = Number(m.expire);
-            var k = new Date(m.expire);
-            if (k < new Date()) {
-                i(m, "Invalid Expiration", origin);
-                return null
-            }
-            if (!m.extend || !m.extend.length) {
-                i(m, "No Extend List Specified", origin);
-                return null
-            }
-            var j = {
-                data: JSON.parse(m.data),
-                expire: m.expire,
-                extend: m.extend
-            };
-            if (m.session === true) {
-                j.session = a
-            }
-            d.setItem(m.key, JSON.stringify(j));
-            return {
-                cmd: m.cmd,
-                id: m.id
-            }
-        },
-        "xauth::retrieve": function (t, l) {
+        "xauth::retrieve": function (t, l, origin) {
             if (!l.retrieve || !l.retrieve.length) {
                 i(l, "No Retrieve List Requested", origin);
                 return null
@@ -437,7 +407,7 @@ if (!this.JSON) {
             }
         },
         "meli::close": function (j, k) {
-          close();
+          window.close();
         }
         
     };
@@ -468,7 +438,7 @@ if (!this.JSON) {
             return
         }
         if (b[l.cmd]) {
-            c(b[l.cmd](k, l), j.origin)
+            c(b[l.cmd](k, l, j.origin), j.origin)
         }
     }
     if (g.addEventListener) {
