@@ -45,6 +45,11 @@ end
 
 task :default => [:build, :minify]
 
+task :wrapper => :build  do 
+  system "sed -ie '/})(cookie, XAuth);/r src/mercadolibre_wrapper_only.js' pkg/mercadolibre.js"
+  system "java -jar vendor/compiler.jar --warning_level VERBOSE --charset utf-8 --compilation_level SIMPLE_OPTIMIZATIONS --js pkg/mercadolibre.js --js_output_file pkg/mercadolibre.min.js"
+end
+
 task :zombie do
   sh "rm -rf vendor/zombie"
   sh "mkdir vendor/zombie"
