@@ -496,6 +496,9 @@ var Sroc = (function() {
     post: function(url, params, callback) {
       this.request("POST", url, params, callback)
     },
+    put: function(url, params, callback) {
+      this.request("PUT", url, params, callback)
+    },
     remove: function(url, params, callback) {
 		this.request("DELETE", url, params, callback)
 	},
