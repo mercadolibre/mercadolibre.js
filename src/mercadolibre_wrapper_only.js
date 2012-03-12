@@ -66,7 +66,6 @@
       }
       return randomstring;
     },
-
     getLoginStatus: function(callback, status) {
       if (status && status.state == "AUTHORIZED") {
         //token circuit is OK, validate cookies
@@ -77,7 +76,7 @@
           //validate user id
           if (cookie("orguseridp") != null && cookie("orguseridp") != "0") {
             if (cookie("orguseridp") != status.authorization_info.user_id) {
-          if (window.MELI.refreshing) {
+              if (window.MELI.refreshing) {
                 window.MELI.logout();
                 window.MELI.refreshing = false;
                 status=null;
@@ -102,7 +101,7 @@
           status.state = "AUTHORIZED";
           status.authorization_info = {
             access_token: cookie("orgapi"),
-            expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
+            expires_in: new Date(new Date().getTime() + parseInt(60) * 1000).getTime(),
             user_id: null
           }
           window.MELI.authorizationState[window.MELI._getKey()] = status;
