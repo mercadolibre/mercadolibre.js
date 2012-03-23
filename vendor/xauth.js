@@ -4,10 +4,11 @@ var XAuth = (function () {
     var data = {
       n: "static.mlstatic.com",
       xdp: "/xd.html",
-      port: ""
+      port: "",
+      protocol: "http://"
     }
     
-    data.e = "http://" + data.n + (data.port?":"+data.port:"") + data.xdp;
+    data.e = data.protocol + data.n + (data.port?":"+data.port:"") + data.xdp;
     var g = null;
     var a = null;
     var p = {};
@@ -15,7 +16,7 @@ var XAuth = (function () {
     var m = [];
     var listeners = null;
     function init() {
-      if (data) data.e = "http://" + data.n + (data.port?":"+data.port:"") + data.xdp;
+      if (data) data.e = data.protocol + data.n + (data.port?":"+data.port:"") + data.xdp;
       if (listeners) return;
       else {
         if (j.addEventListener) {
