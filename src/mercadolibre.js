@@ -197,7 +197,7 @@
       }
 		},
 		_initXAuthClient: function() {
-                        this.options.xauth_domain = this.options.xauth_domain || "www.mercadolibre.com.ar";
+                        this.options.xauth_domain = this.options.xauth_domain || "static.mlstatic.com";
                         this.options.auth_timeout = this.options.auth_timeout || 3000;
                         this.options.xd_url = this.options.xd_url || "/org-img/sdk/xd_20120224-chico.html";
                         this.options.xauth_protocol = this.options.xauth_protocol || "http://";
