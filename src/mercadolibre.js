@@ -669,7 +669,7 @@
 						expires_in : new Date(new Date().getTime() + parseInt(this.hash.expires_in) * 1000).getTime(),
 						user_id : this.hash.user_id
 					},
-          extend_domains: this.hash.extend_domains
+          extend_domains: this.hash.domains.split(",")
 				};
 			}
 			return authorizationState;
