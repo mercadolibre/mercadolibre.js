@@ -358,7 +358,7 @@ if (!this.JSON) {
                     var u = t.match(/(.*\.)?((mercadolibre\.co((m(\.(ar|ve|uy|ec|pe|co|pa|do|mx))?)|\.cr))$|(mercadolibre\.cl$)|(mercadolivre\.com\.br$)|(mercadolivre\.pt$))/);
                     if (!u) {
                       for (var o = 0; o < r.extend.length; o++) {
-                        if (r.extend[o] == "*" || t.match(eval(r.extend[o]))) {
+                        if (t == r.extend[o])
                           u = true;
                           break
                           }
