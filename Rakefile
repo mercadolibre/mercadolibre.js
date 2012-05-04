@@ -36,6 +36,7 @@ file "mercadolibre.js" => ["pkg", "sroc.js"] do |t|
   end
 end
 
+
 task :minify do
   system "java -jar vendor/compiler.jar --warning_level VERBOSE --charset utf-8 --compilation_level SIMPLE_OPTIMIZATIONS --js pkg/mercadolibre.js --js_output_file pkg/mercadolibre.min.js"
 end
@@ -86,8 +87,11 @@ def build(sha1, version)
   stamp = stamp.strftime("%Y%m%d%H%M.%S")
 
   `rake`
-  `mv pkg/mercadolibre.js pkg/mercadolibre-#{version}.js`
-  `mv pkg/mercadolibre.min.js pkg/mercadolibre-#{version}.min.js`
+  `mkdir -p pkg/#{version}`
+  `mv pkg/mercadolibre.js pkg/#{version}/mercadolibre-#{version}.js`
+  `mv pkg/mercadolibre.min.js pkg/#{version}/mercadolibre-#{version}.min.js`
+  
+  `sed 's/{version}/#{version}/' src/xd.html > pkg/xd-#{version}.html`
 
   `touch -t #{stamp} pkg/mercadolibre-#{version}.js`
   `touch -t #{stamp} pkg/mercadolibre-#{version}.min.js`
