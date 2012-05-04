@@ -91,10 +91,10 @@ def build(sha1, version)
   `mv pkg/mercadolibre.js pkg/#{version}/mercadolibre-#{version}.js`
   `mv pkg/mercadolibre.min.js pkg/#{version}/mercadolibre-#{version}.min.js`
   
-  `sed 's/{version}/#{version}/' src/xd.html > pkg/xd-#{version}.html`
+  `sed 's/{version}/#{version}/' src/xd.html > pkg/#{version}/xd-#{version}.html`
 
-  `touch -t #{stamp} pkg/mercadolibre-#{version}.js`
-  `touch -t #{stamp} pkg/mercadolibre-#{version}.min.js`
+  `touch -t #{stamp} pkg/#{version}/mercadolibre-#{version}.js`
+  `touch -t #{stamp} pkg/#{version}/mercadolibre-#{version}.min.js`
 end
 
 class Git
