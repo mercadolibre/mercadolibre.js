@@ -72,7 +72,23 @@ task :zombie do
   end
 end
 
-task :release do
+task :release, :version do |t,args|
+  
+  if args.version.nil?
+    raise "Please provide a release version. usage: rake release[1.0.0]"
+  end
+  
+  #Valida el tag
+  
+   STDOUT.puts "Version does not exist. Create one? (y/n)"
+   input = STDIN.gets.strip
+   
+   if input.downcase == 'y'
+	 raise "You said yes! :)"
+   else
+     raise "Release aborted."
+   end
+  
   `rm -rf pkg`
 
   Git.each_tag do |tag|
