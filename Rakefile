@@ -139,7 +139,7 @@ class Git
 	   else 
 	      if askQuestion("Version does not exist. Create one?")
 	  	       tag = "v" << version
-	  	      `git tag`[tag]
+	  	      `git tag #{tag}`
 	      end
 	   end
 	   
