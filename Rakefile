@@ -108,6 +108,7 @@ def deploy(version)
 	if askQuestion("Deploy release?")
 		puts("Deploying release...")
 		`scp pkg/#{version}/* oraweb@172.16.200.31:/data2/orange/images/sdk`
+		puts("Deploy done")
 	end
 end
 
