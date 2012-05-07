@@ -82,6 +82,8 @@ task :release, :version do |t,args|
    buildTag = Git.processtag args.version
   
   `rm -rf pkg`
+  
+   puts "Building tag: " buildTag
 
    build buildTag, buildTag.sub(/^v/, "") if buildTag
 
@@ -147,17 +149,7 @@ class Git
               exit 1
 	      end
 	   end
-	   
-	   puts tag if tag
-		
-	   STDOUT.puts "Version does not exist. Create one? (y/n)"
-	   input = STDIN.gets.strip
-	   
-	   if input.downcase == 'y' || input == 'Y'
-		 raise "You said yes! :)"
-	   else
-		 raise "Release aborted."
-	   end
+	
   
   end
   
