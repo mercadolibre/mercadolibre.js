@@ -126,8 +126,7 @@ class Git
               exit 1
 	      end
 	   end
-	
-  
+	  return tag
   end
   
 end
