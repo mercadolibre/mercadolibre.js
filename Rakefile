@@ -86,6 +86,8 @@ task :release, :version do |t,args|
    puts ("Building tag: " + buildTag)
 
    build buildTag, buildTag.sub(/^v/, "") if buildTag
+   
+   deploy buildTag
 
 end
 
@@ -102,6 +104,14 @@ def build(sha1, version)
 
   `touch -t #{stamp} pkg/#{version}/mercadolibre-#{version}.js`
   `touch -t #{stamp} pkg/#{version}/mercadolibre-#{version}.min.js`
+end
+
+
+def deploy(version)
+	if askQuestion("Deploy release?")
+		puts("Deploying release...")
+		`scp pkg/#{version}/* oraweb@172.16.200.31:/data2/orange/sdk`
+	end
 end
 
 class Git
