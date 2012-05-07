@@ -83,7 +83,7 @@ task :release, :version do |t,args|
   
   `rm -rf pkg`
   
-   puts "Building tag: " buildTag
+   puts ("Building tag: " + buildTag)
 
    build buildTag, buildTag.sub(/^v/, "") if buildTag
 
@@ -105,29 +105,6 @@ def build(sha1, version)
 end
 
 class Git
-  def self.each_tag
-    current_branch = `git branch`[/^\* (.*)$/, 1]
-
-    begin
-      tags = `git tag -l`.split("\n").sort.reverse
-
-      tags.each do |tag|
-        `git checkout -q #{tag} 2>/dev/null`
-
-        unless $?.success?
-          $stderr.puts "Need a clean working copy. Please git-stash away."
-          exit 1
-        end
-
-        puts(tag)
-
-        yield(tag)
-      end
-    ensure
-      `git checkout -q #{current_branch}`
-    end
-  end
-  
   def self.processtag(version)
 	   
 	   tag = `git tag -l`["v" << version]
