@@ -74,7 +74,7 @@ end
 
 task :release, :version do |t,args|
   
-   $stderr.puts "Please provide a release version. usage: rake release[1.0.0]."; exit 1 unless args.version
+   raise "Please provide a release version. usage: rake release[1.0.0]." unless args.version
   
    buildTag = Git.processtag args.version
   
@@ -107,7 +107,7 @@ end
 def deploy(version)
 	if askQuestion("Deploy release?")
 		puts("Deploying release...")
-		`scp pkg/#{version}/* oraweb@172.16.200.31:/data2/orange/sdk`
+		`scp pkg/#{version}/* oraweb@172.16.200.31:/data2/orange/images/sdk`
 	end
 end
 
