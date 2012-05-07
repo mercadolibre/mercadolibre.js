@@ -74,10 +74,7 @@ end
 
 task :release, :version do |t,args|
   
-  if args.version.nil?
-	 $stderr.puts "Please provide a release version. usage: rake release[1.0.0]."
-     exit 1
-  end
+   $stderr.puts "Please provide a release version. usage: rake release[1.0.0]."; exit 1 unless args.version
   
    buildTag = Git.processtag args.version
   
@@ -114,6 +111,19 @@ def deploy(version)
 	end
 end
 
+
+def askQuestion(question) 
+ STDOUT.puts question +  "(y/n)"
+ input = STDIN.gets.strip
+ if input.downcase == 'y' || input == 'Y' 
+     return true
+ else
+     $stderr.puts "Release aborted."
+     exit 1
+ end
+
+end
+
 class Git
   def self.processtag(version)
 	   
@@ -126,16 +136,12 @@ class Git
             exit 1
 		  end
 	   else 
-		  STDOUT.puts "Version does not exist. Create one? (y/n)"
-	      input = STDIN.gets.strip
-	      if input.downcase == 'y' || input == 'Y'
+	      if askQuestion("Version does not exist. Create one?")
 	  	       tag = "v" << version
 	  	      `git tag`[tag]
-	      else
-		      $stderr.puts "Release aborted."
-              exit 1
 	      end
 	   end
+	   
 	  return tag
   end
   
