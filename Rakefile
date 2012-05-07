@@ -75,27 +75,16 @@ end
 task :release, :version do |t,args|
   
   if args.version.nil?
-    raise "Please provide a release version. usage: rake release[1.0.0]"
+	 $stderr.puts "Please provide a release version. usage: rake release[1.0.0]."
+     exit 1
   end
   
-  #Valida el tag
-  
-   STDOUT.puts "Version does not exist. Create one? (y/n)"
-   input = STDIN.gets.strip
-   
-   if input.downcase == 'y'
-	 raise "You said yes! :)"
-   else
-     raise "Release aborted."
-   end
+   buildTag = Git.processtag args.version
   
   `rm -rf pkg`
 
-  Git.each_tag do |tag|
-    build tag, tag.sub(/^v/, "")
-  end
+   build buildTag, buildTag.sub(/^v/, "") if buildTag
 
-  build "master", "edge"
 end
 
 def build(sha1, version)
@@ -136,4 +125,40 @@ class Git
       `git checkout -q #{current_branch}`
     end
   end
+  
+  def self.processtag(version)
+	   
+	   tag = `git tag -l`["v" << version]
+	   
+	   if tag
+	  	 `git checkout -q #{tag} 2>/dev/null`
+	  	  unless $?.success?
+            $stderr.puts "Need a clean working copy. Please git-stash away."
+            exit 1
+		  end
+	   else 
+		  STDOUT.puts "Version does not exist. Create one? (y/n)"
+	      input = STDIN.gets.strip
+	      if input.downcase == 'y' || input == 'Y'
+	  	       tag = "v" << version
+	  	      `git tag`[tag]
+	      else
+		      $stderr.puts "Release aborted."
+              exit 1
+	      end
+	   end
+	   
+	   puts tag if tag
+		
+	   STDOUT.puts "Version does not exist. Create one? (y/n)"
+	   input = STDIN.gets.strip
+	   
+	   if input.downcase == 'y' || input == 'Y'
+		 raise "You said yes! :)"
+	   else
+		 raise "Release aborted."
+	   end
+  
+  end
+  
 end
