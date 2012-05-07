@@ -84,7 +84,7 @@ task :release, :version do |t,args|
 
    build buildTag, buildTag.sub(/^v/, "") if buildTag
    
-   deploy buildTag
+   deploy buildTag.sub(/^v/, "")
 
 end
 
