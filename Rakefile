@@ -140,7 +140,7 @@ class Git
 	      if askQuestion("Version does not exist. Create one?")
 	  	       tag = "v" << version
 	  	      `git tag #{tag}`
-	  	      `git push origin #{tag}` if $?.success?
+	  	      `git push origin #{tag} 2>/dev/null` if $?.success?
 	      end
 	   end
 	   
