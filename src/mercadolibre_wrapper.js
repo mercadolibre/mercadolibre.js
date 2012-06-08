@@ -154,55 +154,63 @@ var cookie = function(name, value, options) {
         return func.apply(self, allArguments);
       };
     },
+
+    _isLoggedIn: function(){
+      var orgapiValue = cookie("orgapi");
+      return orgapi != null && orgapi != "0";
+    },
+
+    _isOwner: function(status){
+      var owner = cookie("orguseridp")
+      return owner && owner == status.authorization_info.user_id
+    },
+
+    _isIdentified: function(){
+      var orgidValue = cookie("orgid");
+      return orgidValue != null && orgidValue != "0";
+    },
+
+    _refreshAuthorizationState: function(callback){
+      if( window.MELI.refreshing ){
+        window.MELI.refreshing = false;
+        callback(window.MELI.unknownStatus);
+      }else{
+        window.MELI.refreshing = true;
+        window.MELI._expireToken(window.MELI._getKey());
+        window.MELI.getLoginStatus(callback);
+      }
+    },
+
+    _buildIdentifiedStatus: function(status){
+      status.state = "IDENTIFIED";
+      status.authorization_info = {
+        access_token: cookie("orgid"),
+        expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
+        user_id: parseInt(cookie("orguseridp"))
+      };
+      return status;
+    },
+
     getLoginStatus: function(callback, status) {
-      if (status && status.state == "AUTHORIZED") {
-        //token circuit is OK, validate cookies
-        if ((cookie("orgapi")== null || cookie("orgapi") == "0")&& (cookie("orgid") == null || cookie("orgid") == "0")) {
-          window.MELI.logout();
-          status=null;
-        } else if (cookie("orgapi") != null && cookie("orgapi") != "0") {
-          //validate user id
-          if (cookie("orguseridp") != null && cookie("orguseridp") != "0") {
-            if (cookie("orguseridp") != status.authorization_info.user_id) {
-          if (window.MELI.refreshing) {
-                window.MELI.logout();
-                window.MELI.refreshing = false;
-                status=null;
-              } else {
-                window.MELI.refreshing = true;
-                this._expireToken(window.MELI._getKey());
-                window.MELI.getLoginStatus(callback);
-                return;
-              }
-              
-            }
-          }
-        } else if (cookie("orgid") != null && cookie("orgid") != "0") {
-          //identified user
-          status.state = "IDENTIFIED";
-          status.authorization_info.access_token = cookie("orgid");
-          window.MELI.authorizationState[window.MELI._getKey()] = status;
+      if( status.state == "AUTHORIZED") {
+        if ( !_isLoggedIn() || !_isOwner(status) ){
+          _refreshAuthorizationState(callback);
+          return;       
         }
-      } else if (status == null || status.state == "UNKNOWN" || status.state == "NOT_AUTHORIZED") {
-        status = window.MELI.unknownStatus;
-        //if orgapi then is indeed authorized
-        if (cookie("orgapi") != null && cookie("orgapi") != "0") {
-          status.state = "AUTHORIZED";
-          status.authorization_info = {
-            access_token: cookie("orgapi"),
-            expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
-            user_id: null
-          }
-          window.MELI.authorizationState[window.MELI._getKey()] = status;
-        } else if (cookie("orgid") != null && cookie("orgid") != "0") {
+      }
+
+      if( status.state == "UNKNOWN") {
+        if ( _isLoggedIn() ){
+          //como el usuario esta logueado y nosotros tenemos una copia desactualizada ==> refresh
+          _refreshAuthorizationState(callback);
+          return;
+        }
+
+        if( _isIdentified() ){
           //identified user
-          status.state = "IDENTIFIED";
-          status.authorization_info = {
-            access_token: cookie("orgid"),
-            expires_in: new Date(new Date().getTime() + parseInt(10800) * 1000).getTime(),
-            user_id: null
-          }
+          status = _buildIdentifiedStatus(status);
           window.MELI.authorizationState[window.MELI._getKey()] = status;
+          return;
         }
       }
       callback(status);
