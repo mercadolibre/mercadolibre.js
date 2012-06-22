@@ -34,6 +34,7 @@ file "mercadolibre.js" => ["pkg", "sroc.js"] do |t|
   File.open("pkg/#{t.name}", "w") do |file|
     file.write ERB.new(File.read("src/build.erb.js")).result(binding)
   end
+
 end
 
 
@@ -98,6 +99,7 @@ def build(sha1, version)
   `mv pkg/mercadolibre.min.js pkg/#{version}/mercadolibre-#{version}.min.js`
   
   `sed 's/{version}/#{version}/' src/xd.html > pkg/#{version}/xd-#{version}.html`
+  `sed -i 's/{version}/#{version}/' pkg/#{version}/*.js`
 
   `touch -t #{stamp} pkg/#{version}/mercadolibre-#{version}.js`
   `touch -t #{stamp} pkg/#{version}/mercadolibre-#{version}.min.js`
