@@ -1,0 +1,12 @@
+{
+    "name": "mercadolibre.js", 
+    "version": "1.0.0", 
+    "private": true, 
+    "dependencies": {
+    },
+    "devDependencies": {
+        "should": "0.6.x"
+    },
+    "engine": "node ~> 0.6.x"
+}
+
