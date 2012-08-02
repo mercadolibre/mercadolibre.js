@@ -605,11 +605,18 @@
 				else if(message.methodName == "meli::close")
 					p.MELI._logoutComplete();
 
-			} else
-				p.postMessage(JSON.stringify({
-					cmd : message.methodName,
-					data : message.secret
-				}), "*");
+			} else {
+				var ie8Jump = window.top == self;
+				if (ie8Jump) {
+					p.frames["xauthIFrame"].MELI._notifyParent(message);
+				} else {
+					p.postMessage(JSON.stringify({
+						cmd : message.methodName,
+						data : message.secret
+					}), "*");
+				}
+
+			}
 		},
 		// Check if we're returning from a redirect
 		// after authentication inside an iframe.}
@@ -629,7 +636,7 @@
 				if(authorizationState != null) {
 					var secret = this._storeAuthorizationState(authorizationState);
 					this._notifyParent({ methodName : parentMethod, secret : secret });
-          window.close();
+          			window.close();
 				}
 			} else if(this.hash.action == "logout") {
 				this._notifyParent({
