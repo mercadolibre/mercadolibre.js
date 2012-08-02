@@ -591,7 +591,6 @@
 			}
 		},
 		_notifyParent : function(message) {
-			alert("notifyParent called");
 			var p = window.opener || window.parent;
 			if( typeof (p) == "undefined")
 				return;
