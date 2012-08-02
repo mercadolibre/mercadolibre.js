@@ -2617,8 +2617,8 @@ var XAuth = (function () {
 					p.MELI._logoutComplete();
 
 			} else {
-				var ie8 = true;
-				if (ie8) {
+				var ie8Jump = window.top == self;
+				if (ie8Jump) {
 					p.frames["xauthIFrame"].MELI._notifyParent(message);
 				} else {
 					p.postMessage(JSON.stringify({
