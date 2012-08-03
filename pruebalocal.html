@@ -1,0 +1,81 @@
+<html>
+<head>
+</head>
+<body>
+  <script>
+    function appendText(node,txt, clear)
+      {
+        if (!node.firstChild)
+          node.appendChild(document.createTextNode(''));
+        if (clear)
+          node.firstChild.nodeValue = ''
+        node.firstChild.nodeValue += txt;
+      }
+      function logout() {
+        MELI.logout();
+        appendText(document.getElementById("user"), 'n/a', true);
+        appendText(document.getElementById("name"), 'n/a', true);
+        appendText(document.getElementById("lastname"), 'n/a', true);
+        loadData = loginAndGetData;
+      }
+      function login() {
+        MELI.login();
+        setTimeout('reload();', 2000);
+      }
+      function reload() {
+        location.reload();
+      }
+  
+    function getData() {
+          // Additional initialization code here
+      MELI.get("/users/me", {},function(data) {
+      if (data[0] == 200) {
+        appendText(document.getElementById("user"), data[2].nickname, true);
+        appendText(document.getElementById("name"), data[2].first_name, true);
+        appendText(document.getElementById("lastname"), data[2].last_name, true);
+      }});
+
+    
+    }
+    function loginAndGetData() {
+      MELI.login(getData);
+      loadData = getData;
+    }
+    function initData() {
+      MELI.getLoginStatus(function(status) {
+        if (!status || status.state != "AUTHORIZED")
+          loadData = loginAndGetData;
+        else
+          loadData = getData;
+      });
+    }
+    var loadData = null;
+
+  window.mlAsyncInit = function() {
+    MELI.init({client_id: 2866});
+    initData();
+    
+  };
+
+  // Load the SDK Asynchronously
+  (function(d){
+     var js, id = 'meli-jssdk'; if (d.getElementById(id)) {return;}
+     js = d.createElement('script'); js.id = id; js.async = true;
+     js.src = "http://static.mlstatic.com/org-img/sdk/mercadolibre-1.0.2.js";
+     d.getElementsByTagName('head')[0].appendChild(js);
+   }(document));
+</script>
+  
+  
+  
+
+  <table>
+    <tr><td>User:</td><td id="user"></td></tr>
+    <tr><td>Nombre:</td><td id="name"></td></tr>
+    <tr><td>Apellido:</td><td id="lastname"></td></tr>
+  </table>
+  <button onClick="loadData();">Get data</button>
+  <button onClick="logout();">Logout</button>
+</body>
+</html>
+
