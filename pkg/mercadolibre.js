@@ -2210,7 +2210,7 @@ var XAuth = (function () {
 		_initXAuthClient: function() {
                         this.options.xauth_domain = this.options.xauth_domain || "static.mlstatic.com";
                         this.options.auth_timeout = this.options.auth_timeout || 3000;
-                        this.options.xd_url = this.options.xd_url || "/org-img/sdk/xd_20120224-chico.html";
+                        this.options.xd_url = this.options.xd_url || "/org-img/sdk/xd-1.0.2.html";
                         this.options.xauth_protocol = this.options.xauth_protocol || "http://";
 
 			if(this.options.xauth_domain_fallback && !this.messages)
@@ -2617,8 +2617,8 @@ var XAuth = (function () {
 					p.MELI._logoutComplete();
 
 			} else {
-				var ie8 = true;
-				if (ie8) {
+				var ie8Jump = window.top == self;
+				if (ie8Jump) {
 					p.frames["xauthIFrame"].MELI._notifyParent(message);
 				} else {
 					p.postMessage(JSON.stringify({
