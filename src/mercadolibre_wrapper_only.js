@@ -10,7 +10,9 @@
       window.MELI.oldExpireToken = window.MELI._expireToken;
       var self = this;
       window.MELI.getLoginStatus = function(callback) {
-        var newCallback = self._partial(self.getLoginStatus, callback);
+        var newCallback = function(status){
+          self.getLoginStatus(callback, status);
+        };
         window.MELI.oldGetLoginStatus(newCallback);
       }
       window.MELI._expireToken = function(key) {
