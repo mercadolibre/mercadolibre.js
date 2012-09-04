@@ -19,35 +19,26 @@
         window.MELI.oldExpireToken(key);
         //skip subdomain
         var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
-        cookie("orgapi", null, {domain:domain, path:"/"});
         cookie("ats", null, {domain:domain, path:"/"});
         window.MELI.isAuthorizationStateAvaible = false;
-      }
+      }; 
       window.MELI._storeSecret = function(secret) {
           //skip subdomain
           var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
           cookie("ats", JSON.stringify(secret), {domain:domain, path:"/"});
           this.secret = secret;
-      }
+      };
 
       window.MELI._getApplicationInfo = function(callback) {
           window.MELI.appInfo = {id: window.MELI.options.client_id, site_id: window.MELI.options.site_id};
           if (callback) callback();
-      }
+      };
 
       window.MELI._authorizationStateURL = function() {
         return this.authorizationStateURL.replace("SITE", this.appInfo.site_id.toLowerCase()) + "?client_id=" + this.options.client_id + "&redirect_uri=" + encodeURIComponent(this._xd_url()) + "&response_type=token&hashKey=" + obj._randomString(15);
-      }
+      };
 
         
-    },
-
-    _expireToken : function(key) {
-        window.MELI.oldExpireToken(key);
-        //skip subdomain
-        var domain = document.domain.slice(document.domain.indexOf("."), document.domain.length);
-        cookie("ats", null, {domain:domain, path:"/"});
-        window.MELI.isAuthorizationStateAvaible = false;
     },
 
     _partial: function (func /* , 0..n args */ ) {
