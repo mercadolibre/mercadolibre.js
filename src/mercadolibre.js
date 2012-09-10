@@ -606,7 +606,7 @@
 					p.MELI._logoutComplete();
 
 			} else {
-				var ie8Jump = window.top == self;
+				var ie8Jump = this._isIE8() && window.top == self;
 				if (ie8Jump) {
 					p.frames["xauthIFrame"].MELI._notifyParent(message);
 				} else {
@@ -782,6 +782,25 @@
 		},
 		_xd_url : function() {
 			return this.options.xauth_protocol + this.options.xauth_domain + (this.options.xauth_port ? ":" + this.options.xauth_port : "") + this.options.xd_url;
+		},
+		_isIE8 : function () {
+			function getInternetExplorerVersion()
+				// Returns the version of Internet Explorer or a -1
+				// (indicating the use of another browser).
+				{
+				  var rv = -1; // Return value assumes failure.
+				  if (navigator.appName == 'Microsoft Internet Explorer')
+				  {
+				    var ua = navigator.userAgent;
+				    var re  = new RegExp("MSIE ([0-9]{1,}[\.0-9]{0,})");
+				    if (re.exec(ua) != null)
+				      rv = parseFloat( RegExp.$1 );
+				  }
+				  return rv;
+				}
+			var version = getInternetExplorerVersion();
+			return (version >= 8.0 && version < 9.0);
+			}
 		}
 	};
 
