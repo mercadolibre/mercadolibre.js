@@ -34,7 +34,9 @@ file "mercadolibre.js" => ["pkg", "sroc.js"] do |t|
   File.open("pkg/#{t.name}", "w") do |file|
     file.write ERB.new(File.read("src/build.erb.js")).result(binding)
   end
+
 end
+
 
 task :minify do
   system "java -jar vendor/compiler.jar --warning_level VERBOSE --charset utf-8 --compilation_level SIMPLE_OPTIMIZATIONS --js pkg/mercadolibre.js --js_output_file pkg/mercadolibre.min.js"
@@ -71,14 +73,20 @@ task :zombie do
   end
 end
 
-task :release do
+task :release, :version do |t,args|
+  
+   raise "Please provide a release version. usage: rake release[1.0.0]." unless args.version
+  
+   buildTag = Git.processtag args.version
+  
   `rm -rf pkg`
+  
+   puts ("Building tag: " + buildTag)
 
-  Git.each_tag do |tag|
-    build tag, tag.sub(/^v/, "")
-  end
+   build buildTag, buildTag.sub(/^v/, "") if buildTag
+   
+   deploy buildTag.sub(/^v/, "")
 
-  build "master", "edge"
 end
 
 def build(sha1, version)
@@ -86,34 +94,59 @@ def build(sha1, version)
   stamp = stamp.strftime("%Y%m%d%H%M.%S")
 
   `rake`
-  `mv pkg/mercadolibre.js pkg/mercadolibre-#{version}.js`
-  `mv pkg/mercadolibre.min.js pkg/mercadolibre-#{version}.min.js`
+  `mkdir -p pkg/#{version}`
+  `mv pkg/mercadolibre.js pkg/#{version}/mercadolibre-#{version}.js`
+  `mv pkg/mercadolibre.min.js pkg/#{version}/mercadolibre-#{version}.min.js`
+  
+  `sed 's/{version}/#{version}/' src/xd.html > pkg/#{version}/xd-#{version}.html`
+  `sed -i 's/{version}/#{version}/' pkg/#{version}/*.js`
 
-  `touch -t #{stamp} pkg/mercadolibre-#{version}.js`
-  `touch -t #{stamp} pkg/mercadolibre-#{version}.min.js`
+  `touch -t #{stamp} pkg/#{version}/mercadolibre-#{version}.js`
+  `touch -t #{stamp} pkg/#{version}/mercadolibre-#{version}.min.js`
+end
+
+
+def deploy(version)
+	if askQuestion("Deploy release?")
+		puts("Deploying release...")
+		`scp pkg/#{version}/* oraweb@172.16.200.31:/data2/orange/images/sdk`
+		puts("Deploy done")
+	end
+end
+
+
+def askQuestion(question) 
+ STDOUT.puts question +  "(y/n)"
+ input = STDIN.gets.strip
+ if input.downcase == 'y' || input == 'Y' 
+     return true
+ else
+     $stderr.puts "Release aborted."
+     exit 1
+ end
+
 end
 
 class Git
-  def self.each_tag
-    current_branch = `git branch`[/^\* (.*)$/, 1]
-
-    begin
-      tags = `git tag -l`.split("\n").sort.reverse
-
-      tags.each do |tag|
-        `git checkout -q #{tag} 2>/dev/null`
-
-        unless $?.success?
-          $stderr.puts "Need a clean working copy. Please git-stash away."
-          exit 1
-        end
-
-        puts(tag)
-
-        yield(tag)
-      end
-    ensure
-      `git checkout -q #{current_branch}`
-    end
+  def self.processtag(version)
+	   
+	   tag = `git tag -l`["v" << version]
+	   
+	   if tag
+	  	 `git checkout -q #{tag} 2>/dev/null`
+	  	  unless $?.success?
+            $stderr.puts "Need a clean working copy. Please git-stash away."
+            exit 1
+		  end
+	   else 
+	      if askQuestion("Version does not exist. Create one?")
+	  	       tag = "v" << version
+	  	      `git tag #{tag}`
+	  	      `git push origin #{tag} 2>/dev/null` if $?.success?
+	      end
+	   end
+	   
+	  return tag
   end
+  
 end
