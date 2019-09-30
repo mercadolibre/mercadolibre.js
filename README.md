@@ -16,11 +16,11 @@ It  hides all the complexity of OAuth 2.0 and lets you focus on writing applicat
 
 Just include the following source script in your application
 
-    <script src="http://static.mlstatic.com/org-img/sdk/mercadolibre-1.0.4.js"></script>
+    <script src="https://static.mlstatic.com/org-img/sdk/mercadolibre-1.0.4.js"></script>
 
-For https use:
+For the minified version
 
-    <script src="https://a248.e.akamai.net/secure.mlstatic.com/org-img/sdk/mercadolibre-1.0.4.js"></script>
+    <script src="https://static.mlstatic.com/org-img/sdk/mercadolibre-1.0.4.min.js"></script>
 
 Initialize the API with your client_id as follows:
 
