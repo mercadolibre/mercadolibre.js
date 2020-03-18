@@ -1,9 +1,0 @@
-{
-    "name": "mercadolibre.js",
-    "version": "1.0.2",
-    "description": "This is the official JavaScript SDK for MercadoLibre's Platform.",
-    "main": "index.html",
-    "dependencies": {},
-    "devDependencies": {}
-  }
-  
